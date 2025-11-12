@@ -36,7 +36,6 @@ export const RegisterPage = () => {
       message.success("Đăng ký người dung thành công");
       setIsSubmit(true);
       navigate("/login");
-      console.log(res.data);
     } else {
       message.error(res.error);
     }

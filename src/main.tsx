@@ -18,7 +18,17 @@ import DashBoardPage from "./pages/client/admin/dashboard";
 import ManageBookPage from "./pages/client/admin/manage.book";
 import ManageOrderPage from "./pages/client/admin/manage.order";
 import ManageUserPage from "./pages/client/admin/manage.user";
-import viVN from "antd/locale/en_US";
+import viVN from "antd/locale/vi_VN";
+import { OwnerDashBoard } from "./pages/owner/dashboard/owner.dashboard";
+import { BookingList } from "./pages/owner/booking/booking.list";
+import { BookingCalendar } from "./pages/owner/booking/booking.calendar";
+import { PriceDaily } from "./pages/owner/price/price.daily";
+import { PriceFlexible } from "./pages/owner/price/price.flexible";
+import { OwnerSettings } from "./pages/owner/settings/owner.settings";
+import { OwnerReview } from "./pages/owner/dashboard/owner.reviews";
+import { RoomSetup } from "./pages/owner/property/room.setup";
+import { CancellationPolicies } from "./pages/owner/property/cancellation.policies";
+import { PageHotelPolicyView } from "./pages/owner/property/hotel.policy.view";
 
 const router = createBrowserRouter([
   {
@@ -93,6 +103,58 @@ const router = createBrowserRouter([
       },
     ],
   },
+
+  {
+    path: "owner",
+    element: <LayoutAdmin />,
+    children: [
+      {
+        index: true,
+        element: (
+          <ProtectedRoute>
+            <OwnerDashBoard />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "reviews",
+        element: (
+          <ProtectedRoute>
+            <OwnerReview />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "booking",
+        children: [
+          { index: true, element: <BookingList /> },
+          { path: "calendar", element: <BookingCalendar /> },
+        ],
+      },
+
+      {
+        path: "price",
+        children: [
+          { index: true, element: <PriceDaily /> },
+          { path: "flexible", element: <PriceFlexible /> },
+        ],
+      },
+      {
+        path: "property",
+        children: [
+          { index: true, element: <PageHotelPolicyView /> },
+          { path: "rooms", element: <RoomSetup /> },
+          { path: "cancellation", element: <CancellationPolicies /> },
+        ],
+      },
+
+      {
+        path: "settings",
+        element: <OwnerSettings />,
+      },
+    ],
+  },
+
   {
     path: "/login",
     element: <LoginPage />,
