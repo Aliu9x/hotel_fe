@@ -66,7 +66,6 @@ export const DetailRoomType = (props: IProps) => {
   const allImages = [dataImage?.thumbnail, ...(dataImage?.slider || [])].filter(
     Boolean
   );
-  console.log(allImages);
   const carouselRef = React.useRef<any>(null);
   return (
     <>
@@ -260,7 +259,7 @@ export const DetailRoomType = (props: IProps) => {
                           }
                         >
                           <Image
-                            src={`${import.meta.env.VITE_BACKEND_URL}${img}`}
+                            src={`${import.meta.env.VITE_BACKEND_URL}/images/hotel/${dataViewDetail?.hotel_id}/roomType/${dataViewDetail?.id}/${img}`}
                             alt={`hotel-img-${index}`}
                             width={240}
                             height={160}

@@ -1,17 +1,26 @@
 import React, { useState } from "react";
 import {
+  AppstoreOutlined,
+  ExceptionOutlined,
   HeartTwoTone,
+  TeamOutlined,
+  UserOutlined,
   DollarCircleOutlined,
-  BarChartOutlined,
-  BookOutlined,
-  SettingOutlined,
+  MenuFoldOutlined,
+  MenuUnfoldOutlined,
+  EnvironmentOutlined,
+  PushpinOutlined,
+  DashboardOutlined,
 } from "@ant-design/icons";
 import { Layout, Menu, Dropdown, Space, Avatar, Result, Button } from "antd";
 import { Outlet } from "react-router-dom";
 import { Link } from "react-router-dom";
 import { useCurrentApp } from "../context/app.context";
+import type { MenuProps } from "antd";
 import { logoutApi } from "@/services/api";
-import { Content, Footer, Header } from "antd/es/layout/layout";
+type MenuItem = Required<MenuProps>["items"][number];
+
+const { Content, Footer, Sider } = Layout;
 
 const LayoutAdmin = () => {
   const [collapsed, setCollapsed] = useState(false);
@@ -28,73 +37,43 @@ const LayoutAdmin = () => {
       localStorage.removeItem("access_token");
     }
   };
-  const items = [
+  const items: MenuItem[] = [
     {
-      label: "Hiệu suất",
-      key: "performance",
-      icon: <BarChartOutlined />,
+      label: <Link to="/admin">Dashboard</Link>,
+      key: "dashboard",
+      icon: <DashboardOutlined  />,
+    },
+    {
+      label: <span>Manage location</span>,
+      key: "location",
+      icon: <EnvironmentOutlined />,
       children: [
         {
-          label: <Link to="/owner">Bảng điều khiển</Link>,
-          key: "dashboard",
+          label: <Link to="/admin/location/province">Province / City</Link>,
+          key: "province",
+          icon: <PushpinOutlined />,
         },
-        { label: <Link to="/owner/analysis">Phân tích</Link>, key: "analysis" },
-        { label: <Link to="/owner/reviews">Đánh giá</Link>, key: "reviews" },
+        {
+          label: <Link to="/admin/location/district">District</Link>,
+          key: "district",
+          icon: <PushpinOutlined />,
+        },
+        {
+          label: <Link to="/admin/location/ward">Ward</Link>,
+          key: "ward",
+          icon: <PushpinOutlined />,
+        },
       ],
     },
     {
-      label: "Đơn đặt phòng",
-      key: "booking",
-      icon: <BookOutlined />,
-      children: [
-        {
-          label: <Link to="/owner/booking">Danh sách đơn</Link>,
-          key: "booking-list",
-        },
-        {
-          label: <Link to="/owner/booking/calendar">Lịch đặt</Link>,
-          key: "booking-calendar",
-        },
-      ],
-    },
-    {
-      label: "Giá & Tình trạng phòng trống",
-      key: "price",
+      label: <Link to="/admin/hotel">Manage Hotel</Link>,
+      key: "hotel",
       icon: <DollarCircleOutlined />,
-      children: [
-        {
-          label: <Link to="/owner/price/daily">Giá theo ngày</Link>,
-          key: "price-daily",
-        },
-        {
-          label: <Link to="/owner/price/flexible">Giá linh hoạt</Link>,
-          key: "price-flexible",
-        },
-      ],
     },
     {
-      label: "Cơ sở lưu trú",
-      key: "property",
-
-      children: [
-        {
-          label: <Link to="/owner/property">Chính sách lưu trú</Link>,
-          key: "property-details",
-        },
-        {
-          label: <Link to="/owner/property/rooms">Thiết lập phòng</Link>,
-          key: "property-rooms",
-        },
-        {
-          label: <Link to="/owner/property/cancellation">Chính sách hủy</Link>,
-          key: "property-cancellation",
-        },
-      ],
-    },
-    {
-      label: <Link to="/owner/settings">Thiết lập</Link>,
-      key: "settings",
-      icon: <SettingOutlined />,
+      label: <Link to="/admin/amenity">Manage amenity</Link>,
+      key: "amenity",
+      icon: <ExceptionOutlined />,
     },
   ];
 
@@ -150,46 +129,57 @@ const LayoutAdmin = () => {
   return (
     <>
       <Layout style={{ minHeight: "100vh" }} className="layout-admin">
-        {/* ===== HEADER ===== */}
-        <Header
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            background: "#fff",
-            padding: "0 25px",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
-          }}
+        <Sider
+          theme="light"
+          collapsible
+          collapsed={collapsed}
+          onCollapse={(value) => setCollapsed(value)}
         >
-          <div style={{ fontWeight: 600, fontSize: 18, color: "#1890ff" }}>
-            Hotel Admin
+          <div style={{ height: 32, margin: 16, textAlign: "center" }}>
+            Admin
           </div>
-
           <Menu
-            mode="horizontal"
+            defaultSelectedKeys={[activeMenu]}
+            mode="inline"
             items={items}
-            style={{
-              flex: 1,
-              marginLeft: 40,
-              borderBottom: "none",
-            }}
+            onClick={(e) => setActiveMenu(e.key)}
           />
-
-          <Dropdown menu={{ items: itemsDropdown }} trigger={["click"]}>
-            <Space style={{ cursor: "pointer", fontWeight: 500 }}>
-              <Avatar src={urlAvatar} />
-              {user?.fullName}
-            </Space>
-          </Dropdown>
-        </Header>
-        <Content style={{ padding: "15px" }}>
-          <Outlet />
-        </Content>
-
-        <Footer style={{ textAlign: "center", background: "#fff" }}>
-          Hotel Admin Dashboard ©2025 — Made with{" "}
-          <HeartTwoTone twoToneColor="#eb2f96" />
-        </Footer>
+        </Sider>
+        <Layout>
+          <div
+            className="admin-header"
+            style={{
+              height: "50px",
+              borderBottom: "1px solid #ebebeb",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: "0 15px",
+            }}
+          >
+            <span>
+              {React.createElement(
+                collapsed ? MenuUnfoldOutlined : MenuFoldOutlined,
+                {
+                  className: "trigger",
+                  onClick: () => setCollapsed(!collapsed),
+                }
+              )}
+            </span>
+            <Dropdown menu={{ items: itemsDropdown }} trigger={["click"]}>
+              <Space style={{ cursor: "pointer" }}>
+                <Avatar src={urlAvatar} />
+                {user?.fullName}
+              </Space>
+            </Dropdown>
+          </div>
+          <Content style={{ padding: "15px" }}>
+            <Outlet />
+          </Content>
+          <Footer style={{ padding: 0, textAlign: "center" }}>
+            React Test Fresher &copy; Hỏi Dân IT - Made with <HeartTwoTone />
+          </Footer>
+        </Layout>
       </Layout>
     </>
   );

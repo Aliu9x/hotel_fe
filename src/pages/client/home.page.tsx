@@ -1,6 +1,12 @@
-export const HomePage = () => {
-  return <div>
-home
+import HomeHero from "@/components/home/home.hero";
 
-  </div>;
+const HomePage: React.FC = () => {
+  return (
+    <>
+      {" "}
+      <HomeHero />
+    </>
+  );
 };
+
+export default HomePage;

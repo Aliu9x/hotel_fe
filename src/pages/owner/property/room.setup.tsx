@@ -1,5 +1,5 @@
 import { TableRoomType } from "@/components/owner/property/roomsetup/table.room";
 
-export const RoomSetup = () => {
+export const RoomSetupPage = () => {
   return <TableRoomType />;
 };

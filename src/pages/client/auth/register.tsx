@@ -1,11 +1,11 @@
 import {
   Button,
   Form,
-  FormProps,
   Input,
   Card,
   Typography,
   message,
+  type FormProps,
 } from "antd";
 import {
   UserOutlined,
@@ -13,9 +13,9 @@ import {
   PhoneOutlined,
   LockOutlined,
 } from "@ant-design/icons";
-import { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { registerApi } from "@/services/api";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
 const { Title } = Typography;
 
@@ -26,25 +26,52 @@ type FieldType = {
   password: string;
   confirmPassword?: string;
 };
-export const RegisterPage = () => {
-  const [isSubmit, setIsSubmit] = useState(false);
+
+type RoleType = "CUSTOMER" | "HOTEL_OWNER" | string;
+
+export const RegisterPage: React.FC = () => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+  
+  const roleFromState = (location.state as any)?.role as RoleType | undefined;
+  const roleFromQuery = (searchParams.get("role") as RoleType) || undefined;
+  const role: RoleType = useMemo(
+    () => roleFromState || roleFromQuery || "CUSTOMER",
+    [roleFromState, roleFromQuery]
+  );
+
   const onFinish: FormProps<FieldType>["onFinish"] = async (values) => {
     const { phone, email, name, password } = values;
-    const res = await registerApi(email, password, phone, name);
-    if (res.data) {
-      message.success("Đăng ký người dung thành công");
-      setIsSubmit(true);
-      navigate("/login");
-    } else {
-      message.error(res.error);
+    try {
+      setIsSubmitting(true);
+      const res = await registerApi(email, password, phone, name, role);
+      if (res?.data) {
+        message.success(
+          role === "HOTEL_OWNER"
+            ? "Đăng ký đối tác khách sạn thành công"
+            : "Đăng ký người dùng thành công"
+        );
+        if (role === "HOTEL_OWNER") {
+          navigate("/login", { replace: true });
+        } else {
+          navigate("/login", { replace: true });
+        }
+      } else {
+        message.error(res?.error || "Đăng ký thất bại, thử lại sau.");
+      }
+    } catch (e: any) {
+      message.error(
+        e?.response?.data?.message || e?.message || "Có lỗi xảy ra khi đăng ký."
+      );
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const onFinishFailed: FormProps<FieldType>["onFinishFailed"] = (
-    errorInfo
-  ) => {
-    console.log("Failed:", errorInfo);
+  const onFinishFailed: FormProps<FieldType>["onFinishFailed"] = () => {
+    message.error("Vui lòng kiểm tra lại các trường thông tin.");
   };
 
   return (
@@ -61,24 +88,28 @@ export const RegisterPage = () => {
       <Card
         style={{
           width: "100%",
-          maxWidth: 450,
+          maxWidth: 480,
           borderRadius: 16,
           boxShadow: "0 8px 40px rgba(0,0,0,0.15)",
           backdropFilter: "blur(8px)",
-          background: "rgba(255, 255, 255, 0.95)",
+          background: "rgba(255, 255, 255, 0.96)",
         }}
         styles={{
           body: {
-            padding: "40px 30px",
+            padding: "36px 30px",
           },
         }}
       >
-        <div style={{ textAlign: "center", marginBottom: 30 }}>
-          <Title level={2} style={{ color: "#333", marginBottom: 5 }}>
-            Đăng Ký Tài Khoản
+        <div style={{ textAlign: "center", marginBottom: 26 }}>
+          <Title level={2} style={{ color: "#333", marginBottom: 6 }}>
+            {role === "HOTEL_OWNER"
+              ? "Đăng ký Đối tác Khách sạn"
+              : "Đăng Ký Tài Khoản"}
           </Title>
-          <p style={{ color: "#777", fontSize: 15 }}>
-            Tạo tài khoản mới để bắt đầu hành trình của bạn ✨
+          <p style={{ color: "#777", fontSize: 14 }}>
+            {role === "HOTEL_OWNER"
+              ? "Tạo tài khoản đối tác để liệt kê tài sản của bạn."
+              : "Tạo tài khoản mới để bắt đầu hành trình của bạn ✨"}
           </p>
         </div>
 
@@ -135,14 +166,7 @@ export const RegisterPage = () => {
             />
           </Form.Item>
 
-          <Form.Item
-            label="Mật khẩu"
-            name="password"
-            rules={[
-              { required: true, message: "Vui lòng nhập mật khẩu!" },
-              { min: 6, message: "Mật khẩu phải có ít nhất 6 ký tự!" },
-            ]}
-          >
+          <Form.Item label="Mật khẩu" name="password">
             <Input.Password
               prefix={<LockOutlined style={{ color: "#667eea" }} />}
               placeholder="Nhập mật khẩu"
@@ -172,16 +196,22 @@ export const RegisterPage = () => {
             />
           </Form.Item>
 
-          <Form.Item style={{ marginTop: 30 }}>
+          {/* <Form.Item style={{ marginBottom: 0 }}>
+            <span style={{ fontSize: 12, color: "#888" }}>
+              Vai trò đăng ký: <b>{role}</b>
+            </span>
+          </Form.Item> */}
+
+          <Form.Item style={{ marginTop: 20 }}>
             <Button
               type="primary"
               htmlType="submit"
               block
-              loading={isSubmit}
+              loading={isSubmitting}
               style={{
                 height: 45,
                 fontSize: 16,
-                fontWeight: 500,
+                fontWeight: 600,
                 borderRadius: 8,
                 background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
                 border: "none",
@@ -192,10 +222,10 @@ export const RegisterPage = () => {
             </Button>
           </Form.Item>
 
-          <div style={{ textAlign: "center", marginTop: 15 }}>
+          <div style={{ textAlign: "center", marginTop: 12 }}>
             <span style={{ color: "#666" }}>Đã có tài khoản?</span>
             <a
-              href="/login"
+              href={role === "HOTEL_OWNER" ? "/login" : "/login"}
               style={{
                 marginLeft: 6,
                 fontWeight: 600,
@@ -211,3 +241,5 @@ export const RegisterPage = () => {
     </div>
   );
 };
+
+export default RegisterPage;

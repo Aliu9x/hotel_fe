@@ -6,8 +6,8 @@ import {
   Button,
   Typography,
   message,
-  FormProps,
   notification,
+  type FormProps,
 } from "antd";
 import { MailOutlined, LockOutlined } from "@ant-design/icons";
 import { loginApi } from "@/services/api";
@@ -24,7 +24,7 @@ type FieldType = {
 const LoginPage = () => {
   const [isSubmit, setIsSubmit] = useState(false);
   const navigate = useNavigate();
-  const { setIsAuthenticated, setUser } = useCurrentApp();
+  const { setIsAuthenticated, setUser, user } = useCurrentApp();
   const onFinish: FormProps<FieldType>["onFinish"] = async (values) => {
     const { email, password } = values;
     setIsSubmit(true);
@@ -33,7 +33,12 @@ const LoginPage = () => {
       setIsAuthenticated(true), setUser(res.data.user);
       localStorage.setItem("access_token", res.data.access_token);
       message.success(res.message);
-      navigate("/");
+      if (user?.role === "ADMIN") {
+        navigate("/admin");
+      }
+      if (user?.role === "HOTEL_OWNER") {
+        navigate("/partner/dashboard");
+      }
     } else {
       message.error(res.message);
     }

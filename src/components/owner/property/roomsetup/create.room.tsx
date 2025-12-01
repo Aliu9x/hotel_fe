@@ -2,7 +2,7 @@ import {
   commitUpload,
   createAmenityMappings,
   createRoomType,
-  getCategories,
+  getAmenityCategory,
   loadImageRoomType,
   uploadFileAPI,
 } from "@/services/api";
@@ -18,6 +18,7 @@ import {
   Col,
   Divider,
   Form,
+  Image,
   Input,
   InputNumber,
   Modal,
@@ -75,7 +76,7 @@ export const CreateRoomType = (props: IProps) => {
   };
   useEffect(() => {
     const fetchData = async () => {
-      const res = await getCategories("RoomType");
+      const res = await getAmenityCategory("ROOM");
       if (res?.data) setCategories(res.data);
     };
 
@@ -96,7 +97,6 @@ export const CreateRoomType = (props: IProps) => {
       setIsSubmit(true);
       const res = await createRoomType(value);
       if (res.data && res) {
-        console.log(res.data);
 
         await createAmenityMappings(res.data.id, selectedAmenity);
         const sliderPayload = {
@@ -149,8 +149,13 @@ export const CreateRoomType = (props: IProps) => {
   };
 
   const handlePreview = async (file: UploadFile) => {
-    if (!file.url && !file.preview) {
-      file.preview = await getBase64(file.originFileObj as RcFile);
+    if (!file.url && !file.preview && file.originFileObj) {
+      const reader = new FileReader();
+      reader.readAsDataURL(file.originFileObj as RcFile);
+      file.preview = await new Promise<string>((resolve, reject) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+      });
     }
     setPreviewImage(file.url || (file.preview as string));
     setPreviewOpen(true);
@@ -160,16 +165,22 @@ export const CreateRoomType = (props: IProps) => {
     info: UploadChangeParam,
     type: "thumbnail" | "slider"
   ) => {
+    const setLoading =
+      type === "slider" ? setLoadingSlider : setLoadingThumbnail;
+
     if (info.file.status === "uploading") {
-      type === "slider" ? setLoadingSlider(true) : setLoadingThumbnail(true);
+      setLoading(true);
       return;
     }
 
-    if (info.file.status === "done") {
-      type === "slider" ? setLoadingSlider(false) : setLoadingThumbnail(false);
+    if (
+      info.file.status === "done" ||
+      info.file.status === "error" ||
+      info.file.status === "removed"
+    ) {
+      setLoading(false);
     }
   };
-
   const handleRemove = async (file: UploadFile, type: UserUploadType) => {
     if (type === "thumbnail") {
       setFileListThumbnail([]);
@@ -183,31 +194,42 @@ export const CreateRoomType = (props: IProps) => {
     options: RcCustomRequestOptions,
     type: UserUploadType
   ) => {
-    const { onSuccess } = options;
-    const file = options.file as UploadFile;
+    const { onSuccess, onError } = options;
+    const file = options.file as RcFile;
+
+    // bật loading ngay khi bắt đầu
+    type === "slider" ? setLoadingSlider(true) : setLoadingThumbnail(true);
+
     try {
       const res = await uploadFileAPI(file, "book");
       if (res?.data) {
         const uploadedFile: UploadFile = {
-          uid: file.uid,
+          uid: (file as any).uid, // uid do Upload tạo
           name: res.data.fileUploaded,
+          status: "done", // Quan trọng: đánh dấu đã xong
           url: `${import.meta.env.VITE_BACKEND_URL}/images/tmp/${
             res.data.fileUploaded
           }`,
         };
+
         if (type === "thumbnail") {
           setFileListThumbnail([uploadedFile]);
         } else {
           setFileListSlider((prev) => [...prev, uploadedFile]);
         }
-        onSuccess?.("ok");
+
+        // Thông báo thành công cho Upload
+        onSuccess?.(res, file);
       } else {
         message.error(res?.message || "Upload thất bại");
-        onSuccess?.("error");
+        onError?.(new Error(res?.message || "Upload thất bại"));
       }
-    } catch (e) {
+    } catch (e: any) {
       message.error("Lỗi mạng khi upload");
-      onSuccess?.("error");
+      onError?.(e);
+    } finally {
+      // tắt loading trong mọi trường hợp
+      type === "slider" ? setLoadingSlider(false) : setLoadingThumbnail(false);
     }
   };
 
@@ -458,6 +480,14 @@ export const CreateRoomType = (props: IProps) => {
           </div>
         </Form>
       </Modal>
+      <Image
+        style={{ display: "none" }} // ẩn ảnh gốc
+        preview={{
+          visible: previewOpen,
+          src: previewImage,
+          onVisibleChange: (v) => setPreviewOpen(v),
+        }}
+      />
     </>
   );
 };

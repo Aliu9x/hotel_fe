@@ -26,6 +26,9 @@ export const TableRoomType = () => {
   const [openViewDetail, setOpenViewDetail] = useState<boolean>(false);
   const [openViewCreate, setOpenViewCreate] = useState<boolean>(false);
   const [dataViewDetail, setDataViewDetail] = useState<IRoomType | null>(null);
+  const [openViewUpdate, setOpenViewUpdate] = useState<boolean>(false);
+  const [dataUpdate, setDataUpdate] = useState<IRoomType | null>(null);
+
   const refreshTable = () => {
     actionRef.current?.reload();
   };
@@ -38,7 +41,7 @@ export const TableRoomType = () => {
   const handleToggleStatus = async (id: string, checked: boolean) => {
     try {
       await updateRoomType(id, { is_active: checked });
-      message.success(`Đã ${checked ? "mở" : "đóng"} loại phòng`);
+      message.success(`Đã ${checked ? "mở" : "tạm đóng"} loại phòng`);
       actionRef.current?.reload();
     } catch (error) {
       message.error("Cập nhật trạng thái thất bại");
@@ -130,31 +133,22 @@ export const TableRoomType = () => {
             }}
           >
             <div>
-              <Tooltip title="Mở/Tắt loại phòng">
+              <Tooltip title="Mở/Đóng loại phòng">
                 <Switch
                   checked={entity.is_active}
                   checkedChildren="Mở"
-                  unCheckedChildren="đóng"
+                  unCheckedChildren="tạm đóng"
                   onChange={(checked) => handleToggleStatus(entity.id, checked)}
                 />
               </Tooltip>
             </div>
-            {/* <div>
-              {entity.smoking_allowed ? (
-                <Tooltip
-                  title="Cho phép hút thuốc"
-                  style={{ paddingBottom: "50px" }}
-                >
-                  <span style={{ fontSize: 18, lineHeight: 1 }}>🚬</span>
-                </Tooltip>
-              ) : (
-                <div></div>
-              )}
-            </div> */}
-
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <Tooltip title="Chỉnh sửa">
                 <EditTwoTone
+                  onClick={() => {
+                    setDataUpdate(entity);
+                    setOpenViewUpdate(true);
+                  }}
                   twoToneColor="#f57800"
                   style={{ cursor: "pointer" }}
                 />
@@ -230,10 +224,11 @@ export const TableRoomType = () => {
       />
 
       <UpdateRoomType
-        openViewDetail={openViewDetail}
-        setOpenViewDetail={setOpenViewDetail}
-        dataViewDetail={dataViewDetail}
-        setDataViewDetail={setDataViewDetail}
+        dataUpdate={dataUpdate}
+        setDataUpdate={setDataUpdate}
+        openViewUpdate={openViewUpdate}
+        setOpenViewUpdate={setOpenViewUpdate}
+        refreshTable={refreshTable}
       />
 
       <CreateRoomType

@@ -1,6 +1,6 @@
 import HotelPolicyView from "@/components/owner/property/hotel.policy.view";
 
-export const PageHotelPolicyView = () => {
+export const HotelPolicyViewPage = () => {
   return (
     <>
       <HotelPolicyView />

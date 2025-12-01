@@ -11,24 +11,34 @@ import { AppProvider } from "components/context/app.context";
 import LayoutAdmin from "components/layout/layout.admin";
 import { ProtectedRoute } from "./components/auth";
 import { RegisterPage } from "./pages/client/auth/register";
-import { HomePage } from "./pages/client/home.page";
 import { BookPage } from "./pages/client/book.page";
 import { AboutPage } from "./pages/client/about.page";
 import DashBoardPage from "./pages/client/admin/dashboard";
-import ManageBookPage from "./pages/client/admin/manage.book";
-import ManageOrderPage from "./pages/client/admin/manage.order";
-import ManageUserPage from "./pages/client/admin/manage.user";
 import viVN from "antd/locale/vi_VN";
 import { OwnerDashBoard } from "./pages/owner/dashboard/owner.dashboard";
 import { BookingList } from "./pages/owner/booking/booking.list";
-import { BookingCalendar } from "./pages/owner/booking/booking.calendar";
-import { PriceDaily } from "./pages/owner/price/price.daily";
+import { RatePlansPage } from "./pages/owner/price/rate.plans";
 import { PriceFlexible } from "./pages/owner/price/price.flexible";
 import { OwnerSettings } from "./pages/owner/settings/owner.settings";
 import { OwnerReview } from "./pages/owner/dashboard/owner.reviews";
-import { RoomSetup } from "./pages/owner/property/room.setup";
+import { RoomSetupPage } from "./pages/owner/property/room.setup";
 import { CancellationPolicies } from "./pages/owner/property/cancellation.policies";
-import { PageHotelPolicyView } from "./pages/owner/property/hotel.policy.view";
+import { HotelPolicyViewPage } from "./pages/owner/property/hotel.policy.view";
+import LayoutOwner from "./components/layout/layout.owner";
+import { ManageAmenity } from "./pages/client/admin/manage.amenity";
+import ManageHotelPage from "./pages/client/admin/manage.hotel";
+import InventoryPage from "./pages/owner/booking/booking.calendar";
+import ProvincePage from "./pages/client/admin/manage location/province.page";
+import DistrictsPage from "./pages/client/admin/manage location/district.page";
+import WardsPage from "./pages/client/admin/manage location/ward.page";
+import HomePage from "./pages/client/home.page";
+import { SearchResultsPage } from "./pages/client/search.result.page";
+import { HotelDetailPage } from "./pages/client/hotel.detail.page";
+import BookingStep1 from "./components/booking/BookingStep1";
+import BookingStep2 from "./components/booking/BookingStep2";
+import LayoutPartner from "./pages/client/partner/partner.layout";
+import PartnerDashboard from "./components/partner/partner.dashboard";
+import RegisterProperty from "./components/partner/register.property";
 
 const router = createBrowserRouter([
   {
@@ -40,8 +50,24 @@ const router = createBrowserRouter([
         element: <HomePage />,
       },
       {
+        path: "/search-results",
+        element: <SearchResultsPage />,
+      },
+      {
+        path: "/hotel/:hotelId",
+        element: <HotelDetailPage />,
+      },
+      {
         path: "/book",
         element: <BookPage />,
+      },
+      {
+        path: "/booking",
+        element: <BookingStep1 />,
+      },
+      {
+        path: "/booking/comfirm",
+        element: <BookingStep2 />,
       },
       {
         path: "/about",
@@ -57,6 +83,7 @@ const router = createBrowserRouter([
       },
     ],
   },
+
   {
     path: "admin",
     element: <LayoutAdmin />,
@@ -70,29 +97,46 @@ const router = createBrowserRouter([
         ),
       },
       {
-        path: "book",
+        path: "amenity",
         element: (
           <ProtectedRoute>
-            <ManageBookPage />
+            <ManageAmenity />
           </ProtectedRoute>
         ),
       },
       {
-        path: "order",
+        path: "hotel",
         element: (
           <ProtectedRoute>
-            <ManageOrderPage />
+            <ManageHotelPage />
           </ProtectedRoute>
         ),
       },
       {
-        path: "user",
+        path: "location/province",
         element: (
           <ProtectedRoute>
-            <ManageUserPage />
+            <ProvincePage />
           </ProtectedRoute>
         ),
       },
+      {
+        path: "location/district",
+        element: (
+          <ProtectedRoute>
+            <DistrictsPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "location/ward",
+        element: (
+          <ProtectedRoute>
+            <WardsPage />
+          </ProtectedRoute>
+        ),
+      },
+
       {
         path: "/admin",
         element: (
@@ -106,7 +150,7 @@ const router = createBrowserRouter([
 
   {
     path: "owner",
-    element: <LayoutAdmin />,
+    element: <LayoutOwner />,
     children: [
       {
         index: true,
@@ -128,22 +172,22 @@ const router = createBrowserRouter([
         path: "booking",
         children: [
           { index: true, element: <BookingList /> },
-          { path: "calendar", element: <BookingCalendar /> },
+          { path: "calendar", element: <InventoryPage /> },
         ],
       },
 
       {
         path: "price",
         children: [
-          { index: true, element: <PriceDaily /> },
+          { index: true, element: <RatePlansPage /> },
           { path: "flexible", element: <PriceFlexible /> },
         ],
       },
       {
         path: "property",
         children: [
-          { index: true, element: <PageHotelPolicyView /> },
-          { path: "rooms", element: <RoomSetup /> },
+          { index: true, element: <HotelPolicyViewPage /> },
+          { path: "rooms", element: <RoomSetupPage /> },
           { path: "cancellation", element: <CancellationPolicies /> },
         ],
       },
@@ -153,6 +197,38 @@ const router = createBrowserRouter([
         element: <OwnerSettings />,
       },
     ],
+  },
+
+  {
+    path: "partner",
+    element: <LayoutPartner />,
+    children: [
+      {
+        index: true,
+        path: "login",
+        element: <LoginPage />,
+      },
+      {
+        path: "register",
+        element: <RegisterPage />,
+      },
+    ],
+  },
+  {
+    path: "partner/dashboard",
+    element: (
+      <ProtectedRoute>
+        <PartnerDashboard />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "partner/register/:code",
+    element: (
+      <ProtectedRoute>
+        <RegisterProperty />
+      </ProtectedRoute>
+    ),
   },
 
   {
@@ -167,12 +243,12 @@ const router = createBrowserRouter([
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <App>
-      <AppProvider>
-        <ConfigProvider locale={viVN}>
+    <AppProvider>
+      <ConfigProvider locale={viVN}>
+        <App>
           <RouterProvider router={router} />
-        </ConfigProvider>
-      </AppProvider>
-    </App>
+        </App>
+      </ConfigProvider>
+    </AppProvider>
   </StrictMode>
 );

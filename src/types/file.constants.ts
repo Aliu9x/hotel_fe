@@ -7,3 +7,11 @@ export const Folder = {
 } as const;
 
 export type FolderType = (typeof Folder)[keyof typeof Folder];
+
+
+export const HotelApprovalStatus= {
+  PENDING: 'PENDING',
+  APPROVED : 'APPROVED',
+  SUSPENDED : 'SUSPENDED',
+}
+
