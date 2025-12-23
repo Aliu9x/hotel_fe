@@ -1,344 +1,352 @@
-// src/components/admin/hotel/detail.hotel.tsx
-
-import { Drawer, Descriptions, Tag, Divider, Space, Avatar, Rate } from "antd";
+import React, { useEffect, useState, useCallback } from "react";
 import {
-  EnvironmentOutlined,
-  PhoneOutlined,
-  MailOutlined,
-  ClockCircleOutlined,
-  GlobalOutlined,
-  InfoCircleOutlined,
-  CalendarOutlined,
-  IdcardOutlined,
-  HomeOutlined,
+  Drawer,
+  Descriptions,
+  Tag,
+  message,
+  Space,
+  Button,
+  Image,
+  Typography,
+  Divider,
+  Row,
+  Col,
+  Skeleton,
+  Popconfirm,
+  Tooltip,
+  Rate,
+  Empty,
+} from "antd";
+import {
+  getHotelById,
+  updateHotelApproval,
+} from "@/services/api";
+import {
+  CheckCircleTwoTone,
+  StopTwoTone,
+  ClockCircleTwoTone,
+  FilePdfTwoTone,
+  ReloadOutlined,
 } from "@ant-design/icons";
-import dayjs from "dayjs";
 
-interface IProps {
+const { Paragraph, Text, Link } = Typography;
+
+interface DetailHotelProps {
   open: boolean;
   onClose: () => void;
-  data: IHotel | null;
+  data: IHotel | null; 
+  onApproved?: () => void; 
 }
 
-const DetailHotel = (props: IProps) => {
-  const { open, onClose, data } = props;
+const statusMap: Record<
+  HotelApprovalStatus,
+  { color: string; text: string; icon: React.ReactNode }
+> = {
+  PENDING: {
+    color: "orange",
+    text: "⏳ Chờ duyệt",
+    icon: <ClockCircleTwoTone twoToneColor="#faad14" />,
+  },
+  APPROVED: {
+    color: "green",
+    text: "✅ Đã duyệt",
+    icon: <CheckCircleTwoTone twoToneColor="#52c41a" />,
+  },
+  SUSPENDED: {
+    color: "red",
+    text: "🚫 Tạm ngưng",
+    icon: <StopTwoTone twoToneColor="#ff4d4f" />,
+  },
+};
 
-  if (!data) return null;
+const DetailHotel: React.FC<DetailHotelProps> = ({
+  open,
+  onClose,
+  data,
+  onApproved,
+}) => {
+  const [loading, setLoading] = useState(false);
+  const [hotel, setHotel] = useState<IHotel | null>(data);
+  const [updating, setUpdating] = useState<HotelApprovalStatus | null>(null);
 
-  // ✅ Format địa chỉ
-  const fullAddress = [
-    data.address_line,
-    data.ward,
-    data.district,
-    data.city,
-    data.province,
-  ]
-    .filter(Boolean)
-    .join(", ");
+  const backend = (import.meta.env.VITE_BACKEND_URL as string) || "";
 
-  // ✅ Format trạng thái
-  const getStatusConfig = (status: string) => {
-    const configs = {
-      PENDING: { color: "orange", text: "⏳ Chờ duyệt" },
-      APPROVED: { color: "green", text: "✅ Đã duyệt" },
-      SUSPENDED: { color: "red", text: "🚫 Tạm ngưng" },
-    };
+  const buildContractUrl = (filename?: string) =>
+    filename ? `${backend}/images/contract/${filename}` : undefined;
+
+  const identityUrl = buildContractUrl(hotel?.identity_doc_filename);
+  const contractUrl = buildContractUrl(hotel?.contract_pdf_filename);
+
+  const fetchDetail = useCallback(async () => {
+    if (!data?.id) return;
+    setLoading(true);
+    try {
+      const res = await getHotelById(data.id);
+      setHotel(res.data ?? null);
+    } catch {
+      message.error("Không tải được chi tiết khách sạn");
+    } finally {
+      setLoading(false);
+    }
+  }, [data?.id]);
+
+  useEffect(() => {
+    if (open && data?.id) {
+      fetchDetail();
+    } else {
+      setHotel(data || null);
+    }
+  }, [open, data?.id, fetchDetail, data]);
+
+  const doApproval = async (status: HotelApprovalStatus) => {
+    if (!hotel?.id) return;
+    if (hotel.approval_status === status) return;
+    try {
+      setUpdating(status);
+      await updateHotelApproval(hotel.id, status);
+      message.success("Cập nhật trạng thái thành công");
+      await fetchDetail();
+      onApproved?.();
+    } catch {
+      message.error("Cập nhật trạng thái thất bại");
+    } finally {
+      setUpdating(null);
+    }
+  };
+
+  const renderStatusTag = (s?: HotelApprovalStatus) => {
+    if (!s) return <Tag>Không rõ</Tag>;
+    const cfg = statusMap[s];
     return (
-      configs[status as keyof typeof configs] || {
-        color: "default",
-        text: status,
-      }
+      <Tag color={cfg.color}>
+        <Space size={6}>
+          {cfg.icon}
+          <span>{cfg.text}</span>
+        </Space>
+      </Tag>
     );
   };
 
-  const statusConfig = getStatusConfig(data.approval_status);
+  const ActionButtons = () => (
+    <Space wrap>
+      <Tooltip title="Tải lại">
+        <Button icon={<ReloadOutlined />} onClick={fetchDetail} />
+      </Tooltip>
+      <Popconfirm
+        title="Chuyển trạng thái về Chờ duyệt?"
+        onConfirm={() => doApproval("PENDING")}
+        okText="Xác nhận"
+        cancelText="Hủy"
+        disabled={loading || hotel?.approval_status === "PENDING"}
+      >
+        <Button
+          disabled={loading || hotel?.approval_status === "PENDING"}
+          loading={updating === "PENDING"}
+        >
+          Chờ duyệt
+        </Button>
+      </Popconfirm>
+      <Popconfirm
+        title="Duyệt khách sạn này?"
+        onConfirm={() => doApproval("APPROVED")}
+        okText="Duyệt"
+        cancelText="Hủy"
+        disabled={loading || hotel?.approval_status === "APPROVED"}
+      >
+        <Button
+          type="primary"
+          disabled={loading || hotel?.approval_status === "APPROVED"}
+          loading={updating === "APPROVED"}
+        >
+          Duyệt
+        </Button>
+      </Popconfirm>
+      <Popconfirm
+        title="Tạm ngưng khách sạn này?"
+        onConfirm={() => doApproval("SUSPENDED")}
+        okText="Tạm ngưng"
+        cancelText="Hủy"
+        disabled={loading || hotel?.approval_status === "SUSPENDED"}
+      >
+        <Button
+          danger
+          disabled={loading || hotel?.approval_status === "SUSPENDED"}
+          loading={updating === "SUSPENDED"}
+        >
+          Tạm ngưng
+        </Button>
+      </Popconfirm>
+    </Space>
+  );
 
   return (
     <Drawer
-      title={
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <Avatar
-            size={40}
-            style={{ background: "#1890ff" }}
-            icon={<HomeOutlined />}
-          />
-          <div>
-            <div style={{ fontSize: 18, fontWeight: 600 }}>
-              Chi tiết khách sạn
-            </div>
-            <div style={{ fontSize: 12, color: "#999", fontWeight: 400 }}>
-              ID: {data.id}
-            </div>
-          </div>
-        </div>
-      }
-      placement="right"
-      width="50vw"
+      title="Chi tiết khách sạn"
+      width={860}
       open={open}
       onClose={onClose}
-      bodyStyle={{ paddingBottom: 80 }}
+      destroyOnClose
+      extra={<ActionButtons />}
     >
-      <div
-        style={{
-          background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-          padding: "24px",
-          borderRadius: 8,
-          marginBottom: 24,
-          color: "white",
-          marginTop: -24,
-          marginLeft: -24,
-          marginRight: -24,
-        }}
-      >
-        <div style={{ fontSize: 24, fontWeight: 700, marginBottom: 12 }}>
-          {data.name}
+      {loading ? (
+        <div>
+          <Skeleton active paragraph={{ rows: 6 }} />
+          <Divider />
+          <Skeleton.Image active style={{ width: 300, height: 180 }} />
+          <div style={{ height: 12 }} />
+          <Skeleton.Input active style={{ width: 240 }} />
         </div>
-        <Space size="large" wrap>
-          <Tag
-            color={statusConfig.color}
-            style={{ fontSize: 14, padding: "4px 12px" }}
+      ) : !hotel ? (
+        <Empty description="Không có dữ liệu" />
+      ) : (
+        <>
+          {/* Thông tin cơ bản */}
+          <Typography.Title level={5} style={{ marginTop: 0 }}>
+            Thông tin cơ bản
+          </Typography.Title>
+          <Descriptions
+            column={2}
+            bordered
+            size="small"
+            labelStyle={{ width: 160 }}
           >
-            {statusConfig.text}
-          </Tag>
-          <span style={{ opacity: 0.9 }}>
-            <GlobalOutlined /> {data.country_code}
-          </span>
-          <span style={{ opacity: 0.9 }}>
-            <ClockCircleOutlined /> {data.timezone}
-          </span>
-        </Space>
-      </div>
+            <Descriptions.Item label="Tên">
+              <Text copyable={{ tooltips: ["Sao chép", "Đã sao chép"] }}>
+                {hotel.name}
+              </Text>
+            </Descriptions.Item>
+            <Descriptions.Item label="Trạng thái">
+              {renderStatusTag(hotel.approval_status)}
+            </Descriptions.Item>
 
-      <div style={{ marginBottom: 24 }}>
-        <div
-          style={{
-            fontSize: 16,
-            fontWeight: 600,
-            marginBottom: 12,
-            color: "#1890ff",
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-          }}
-        >
-          <PhoneOutlined />
-          Thông tin liên hệ
-        </div>
-        <Descriptions bordered column={1} size="small">
-          <Descriptions.Item
-            label={
-              <span>
-                <MailOutlined style={{ marginRight: 8 }} />
-                Email
-              </span>
-            }
-          >
-            {data.email ? (
-              <a href={`mailto:${data.email}`} style={{ color: "#1890ff" }}>
-                {data.email}
-              </a>
-            ) : (
-              <span style={{ color: "#999" }}>Chưa có</span>
-            )}
-          </Descriptions.Item>
+            <Descriptions.Item label="Hạng sao">
+              {typeof hotel.star_rating === "number" ? (
+                <Rate disabled value={hotel.star_rating} />
+              ) : (
+                <Text type="secondary">Chưa đánh giá</Text>
+              )}
+            </Descriptions.Item>
+            <Descriptions.Item label="Thời gian tạo">
+              {hotel.created_at
+                ? new Date(hotel.created_at).toLocaleString()
+                : "-"}
+            </Descriptions.Item>
 
-          <Descriptions.Item
-            label={
-              <span>
-                <PhoneOutlined style={{ marginRight: 8 }} />
-                Số điện thoại
-              </span>
-            }
-          >
-            {data.phone ? (
-              <a href={`tel:${data.phone}`} style={{ color: "#1890ff" }}>
-                {data.phone}
-              </a>
-            ) : (
-              <span style={{ color: "#999" }}>Chưa có</span>
-            )}
-          </Descriptions.Item>
-        </Descriptions>
-      </div>
+            <Descriptions.Item label="Địa chỉ" span={2}>
+              {[
+                hotel.address_line,
+                hotel.ward_name,
+                hotel.district_name,
+                hotel.province_name,
+              ]
+                .filter(Boolean)
+                .join(", ") || "-"}
+            </Descriptions.Item>
+            <Descriptions.Item label="Mô tả" span={2}>
+              <Paragraph ellipsis={{ rows: 3, expandable: true, symbol: "Xem thêm" }}>
+                {hotel.description || "-"}
+              </Paragraph>
+            </Descriptions.Item>
+          </Descriptions>
 
-      <div style={{ marginBottom: 24 }}>
-        <div
-          style={{
-            fontSize: 16,
-            fontWeight: 600,
-            marginBottom: 12,
-            color: "#1890ff",
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-          }}
-        >
-          <EnvironmentOutlined />
-          Địa chỉ
-        </div>
-        <Descriptions bordered column={1} size="small">
-          <Descriptions.Item label="Địa chỉ đầy đủ">
-            {fullAddress || (
-              <span style={{ color: "#999" }}>Chưa có thông tin địa chỉ</span>
-            )}
-          </Descriptions.Item>
+          <Divider />
 
-          <Descriptions.Item label="Địa chỉ chi tiết">
-            {data.address_line || (
-              <span style={{ color: "#999" }}>Chưa có</span>
-            )}
-          </Descriptions.Item>
+          {/* Liên hệ & Pháp lý */}
+          <Typography.Title level={5}>Liên hệ & Pháp lý</Typography.Title>
+          <Row gutter={[16, 16]}>
+            <Col xs={24} md={12}>
+              <Descriptions
+                title="Thông tin liên hệ"
+                size="small"
+                bordered
+                column={1}
+              >
+                <Descriptions.Item label="Tên liên hệ">
+                  {hotel.contact_name || "-"}
+                </Descriptions.Item>
+                <Descriptions.Item label="SĐT">
+                  {hotel.contact_phone ? (
+                    <Text copyable>{hotel.contact_phone}</Text>
+                  ) : (
+                    "-"
+                  )}
+                </Descriptions.Item>
+                <Descriptions.Item label="Email">
+                  {hotel.contact_email ? (
+                    <Text copyable>{hotel.contact_email}</Text>
+                  ) : (
+                    "-"
+                  )}
+                </Descriptions.Item>
+              </Descriptions>
+            </Col>
+            <Col xs={24} md={12}>
+              <Descriptions title="Pháp lý" size="small" bordered column={1}>
+                <Descriptions.Item label="Đơn vị pháp lý">
+                  {hotel.legal_name || "-"}
+                </Descriptions.Item>
+                <Descriptions.Item label="Địa chỉ pháp lý">
+                  {hotel.legal_address || "-"}
+                </Descriptions.Item>
+                <Descriptions.Item label="Người ký">
+                  {hotel.signer_full_name || "-"}
+                </Descriptions.Item>
+                <Descriptions.Item label="SĐT người ký">
+                  {hotel.signer_phone || "-"}
+                </Descriptions.Item>
+                <Descriptions.Item label="Email người ký">
+                  {hotel.signer_email || "-"}
+                </Descriptions.Item>
+              </Descriptions>
+            </Col>
+          </Row>
 
-          <Descriptions.Item label="Phường/Xã">
-            {data.ward || <span style={{ color: "#999" }}>Chưa có</span>}
-          </Descriptions.Item>
+          <Divider />
 
-          <Descriptions.Item label="Quận/Huyện">
-            {data.district || <span style={{ color: "#999" }}>Chưa có</span>}
-          </Descriptions.Item>
-
-          <Descriptions.Item label="Thành phố">
-            {data.city || <span style={{ color: "#999" }}>Chưa có</span>}
-          </Descriptions.Item>
-
-          <Descriptions.Item label="Tỉnh/Thành phố">
-            {data.province || <span style={{ color: "#999" }}>Chưa có</span>}
-          </Descriptions.Item>
-        </Descriptions>
-      </div>
-
-      {data.description && (
-        <div style={{ marginBottom: 24 }}>
-          <div
-            style={{
-              fontSize: 16,
-              fontWeight: 600,
-              marginBottom: 12,
-              color: "#1890ff",
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-            }}
-          >
-            <InfoCircleOutlined />
-            Mô tả
-          </div>
-          <div
-            style={{
-              padding: 16,
-              background: "#f5f5f5",
-              borderRadius: 8,
-              whiteSpace: "pre-wrap",
-              lineHeight: 1.8,
-              border: "1px solid #e8e8e8",
-            }}
-          >
-            {data.description}
-          </div>
-        </div>
+          {/* Tài liệu */}
+          <Typography.Title level={5}>Tài liệu</Typography.Title>
+          <Row gutter={[16, 16]}>
+            <Col xs={24} md={12}>
+              <Space direction="vertical" size={8} style={{ width: "100%" }}>
+                <Text strong>Ảnh CCCD</Text>
+                {identityUrl ? (
+                  <Image
+                    src={identityUrl}
+                    alt="CCCD"
+                    width={320}
+                    style={{
+                      border: "1px solid #f0f0f0",
+                      borderRadius: 6,
+                      boxShadow: "0 1px 2px rgba(0,0,0,.04)",
+                    }}
+                    placeholder
+                  />
+                ) : (
+                  <Text type="secondary">Không có</Text>
+                )}
+              </Space>
+            </Col>
+            <Col xs={24} md={12}>
+              <Space direction="vertical" size={8}>
+                <Text strong>Hợp đồng PDF</Text>
+                {contractUrl ? (
+                  <Button
+                    type="default"
+                    icon={<FilePdfTwoTone twoToneColor="#fa541c" />}
+                    href={contractUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Mở/Tải hợp đồng
+                  </Button>
+                ) : (
+                  <Text type="secondary">Không có</Text>
+                )}
+              </Space>
+            </Col>
+          </Row>
+        </>
       )}
-
-      <Divider />
-
-      <div>
-        <div
-          style={{
-            fontSize: 16,
-            fontWeight: 600,
-            marginBottom: 12,
-            color: "#1890ff",
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-          }}
-        >
-          <IdcardOutlined />
-          Thông tin hệ thống
-        </div>
-        <Descriptions.Item label="Hạng sao">
-          {data.star_rating ? (
-            <div>
-              <Rate
-                disabled
-                value={data.star_rating}
-                style={{ fontSize: 16 }}
-              />
-              <span style={{ marginLeft: 8 }}>({data.star_rating} sao)</span>
-            </div>
-          ) : (
-            <span style={{ color: "#999" }}>Chưa đánh giá</span>
-          )}
-        </Descriptions.Item>
-        <Descriptions bordered column={1} size="small">
-          <Descriptions.Item label="ID">
-            <Tag color="blue">{data.id}</Tag>
-          </Descriptions.Item>
-
-          <Descriptions.Item label="Trạng thái">
-            <Tag color={statusConfig.color}>{statusConfig.text}</Tag>
-          </Descriptions.Item>
-
-          <Descriptions.Item
-            label={
-              <span>
-                <GlobalOutlined style={{ marginRight: 8 }} />
-                Mã quốc gia
-              </span>
-            }
-          >
-            {data.country_code}
-          </Descriptions.Item>
-
-          <Descriptions.Item
-            label={
-              <span>
-                <ClockCircleOutlined style={{ marginRight: 8 }} />
-                Múi giờ
-              </span>
-            }
-          >
-            {data.timezone}
-          </Descriptions.Item>
-
-          <Descriptions.Item
-            label={
-              <span>
-                <CalendarOutlined style={{ marginRight: 8 }} />
-                Ngày tạo
-              </span>
-            }
-          >
-            {dayjs(data.created_at).format("DD/MM/YYYY HH:mm:ss")}
-          </Descriptions.Item>
-
-          <Descriptions.Item
-            label={
-              <span>
-                <CalendarOutlined style={{ marginRight: 8 }} />
-                Cập nhật lần cuối
-              </span>
-            }
-          >
-            {dayjs(data.updatedAt).format("DD/MM/YYYY HH:mm:ss")}
-          </Descriptions.Item>
-        </Descriptions>
-      </div>
-
-      <div
-        style={{
-          marginTop: 24,
-          padding: 12,
-          background: "#e6f7ff",
-          border: "1px solid #91d5ff",
-          borderRadius: 6,
-          fontSize: 13,
-          color: "#0050b3",
-        }}
-      >
-        💡 <strong>Ghi chú:</strong> Thông tin được cập nhật lần cuối vào{" "}
-        {dayjs(data.updatedAt).format("DD/MM/YYYY HH:mm:ss")} bởi{" "}
-        <strong>Aliu9x</strong>
-      </div>
     </Drawer>
   );
 };

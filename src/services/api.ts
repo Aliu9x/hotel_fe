@@ -4,6 +4,7 @@ import type {
   HotelRoomTypesResponse,
   IAvailabilityParams,
   ISuggestItem,
+  ModerationStatus,
 } from "@/types/global";
 import axios from "services/axios.customize";
 import {
@@ -11,6 +12,7 @@ import {
   buildGetAllHotels,
   buildQuery,
 } from "./helper";
+import type { HotelApprovalStatus, Role } from "@/types/file.constants";
 const headers = {
   delay: 1000,
 };
@@ -50,9 +52,15 @@ export const logoutApi = () => {
   return axios.post(urlBackend, { headers });
 };
 
-export const getUserApi = (query: string) => {
-  const urlBackend = `/api/v1/user?${query}`;
-  return axios.get<IBackendRes<IModelPaginate<IUserTable>>>(urlBackend);
+export const getUserApi = (params: UserQuery) => {
+  const queryNew = buildGetAllHotels(params);
+  const urlBackend = `/api/v1/users${queryNew}`;
+  return axios.get<any>(urlBackend);
+};
+
+export const createUserApi = (payload: any) => {
+  const urlBackend = `/api/v1/users`;
+  return axios.post<any>(urlBackend, payload);
 };
 ///////////////////////////////////////////////////////////////////////////////////
 
@@ -116,6 +124,17 @@ export const getAmenityCategory = (type: string) => {
   const urlBackend = `/api/v1/amenity-category/type?applies_to=${type}`;
   return axios.get<IBackendRes<ICategory[]>>(urlBackend);
 };
+
+export const updateAmenitySearch = (id: string, active: boolean) => {
+  const urlBackend = `/api/v1/amenity-category/${id}`;
+  return axios.post<IBackendRes<ICategory[]>>(urlBackend, { active });
+};
+
+export const getAmenitySearch = (type: string) => {
+  const urlBackend = `/api/v1/amenity-category/filter?applies_to=${type}`;
+  return axios.get<IBackendRes<ICategory[]>>(urlBackend);
+};
+
 ////////////////////////////////////////////////////////////////////
 export interface IListCategoriesParams {
   q?: string;
@@ -169,8 +188,20 @@ export const deleteAmenityCategory = (id: string) => {
 
 export const getAllHotels = (queryString?: string | IListHotelsParams) => {
   const queryNew = buildGetAllHotels(queryString);
-  const url = `/api/v1/hotels${queryNew}`;
+  const url = `/api/v1/hotels/${queryNew}`;
   return axios.get<IBackendRes<IModelPaginate<IHotel>>>(url);
+};
+
+export const getHotelById = (id: string) => {
+  const url = `/api/v1/hotels/${id}`;
+  return axios.get<any>(url);
+};
+export const updateHotelApproval = (
+  id: string | number,
+  status: HotelApprovalStatus
+) => {
+  const url = `/api/v1/hotels/${id}/approval`;
+  return axios.patch<IBackendRes<IModelPaginate<IHotel>>>(url, { status });
 };
 
 ///////////////////////////////////////////////////
@@ -189,18 +220,13 @@ export interface CreateHotelPayload {
   contact_phone?: string;
 }
 
-// POST /api/v1/hotels – controller trả { author, statusCode, message, data: hotel }
 export async function createHotel(payload: CreateHotelPayload) {
-  console.log("[API] createHotel payload =", payload);
   const res = await axios.post("/api/v1/hotels", payload);
   const data = res.data?.data ?? res.data;
-  console.log("[API] createHotel response =", data);
-  return data; // hotel object
+  return data;
 }
 
-// POST /api/v1/hotels/contract/files – token-based
 export async function uploadContractFiles(
-  // tham số giữ để tương thích, BE đã lấy hotel theo token
   _unusedHotelId: number | string,
   options: { contract_pdf?: File | null; identity_doc?: File | null }
 ) {
@@ -272,8 +298,17 @@ export const createAmenityMappings = (room_type_id: any, amenity_ids: any) => {
   });
 };
 
+export const loadImageHotel = () => {
+  const urlBackend = "/api/v1/hotels/load-images";
+  return axios.get<IBackendRes<ILoadImage>>(urlBackend);
+};
+
 export const getAmenityMappings = (id?: string) => {
   const urlBackend = `/api/v1/amenity-mappings?room_type_id=${id}`;
+  return axios.get<IBackendRes<ICategory[]>>(urlBackend);
+};
+export const getAmenityMappingsHotel = () => {
+  const urlBackend = `/api/v1/amenity-mappings`;
   return axios.get<IBackendRes<ICategory[]>>(urlBackend);
 };
 
@@ -400,7 +435,7 @@ export async function suggestSearch(q: string, limit = 12, types?: string) {
 export const searchAvailability = async (params: IAvailabilityParams) => {
   const query = buildAvailabilityQuery(params);
   const url = `/api/v1/search/availability?${query}`;
-  return axios.get<{ data: AvailabilityResponse }>(url);
+  return axios.post<{ data: AvailabilityResponse }>(url);
 };
 ////////////////////////////
 
@@ -412,13 +447,21 @@ export const fetchHotelRoomTypes = async (params: IHotelRoomTypesParams) => {
 };
 
 /////////////////////////boongKing//////////////////
-export const createBooking = async (payload: CreateBookingPayload) => {
-  const res = await axios.post<{ data: any }>(
-    "/api/v1/bookings/create",
-    payload
-  );
-  return res.data;
-};
+export async function createBooking(payload: any) {
+  const url = "/api/v1/bookings";
+  return axios.post<IBackendRes<CreateBookingPayload>>(url, payload);
+}
+export async function startMomoPayment(bookingId: string | number) {
+  const url = `api/v1/bookings/${bookingId}/pay/momo`;
+  const resp = await axios.post(url);
+  const payload = resp?.data?.data ?? resp?.data;
+  return {
+    bookingId: payload?.bookingId,
+    payUrl: payload?.payUrl,
+    orderId: payload?.orderId,
+    requestId: payload?.requestId,
+  };
+}
 
 export const reserveBooking = async (bookingId: number) => {
   const res = await axios.post<{ data: any }>("/api/v1/bookings/reserve", {
@@ -448,7 +491,38 @@ export const updatePaymentMethod = async (
   return res.data;
 };
 
-export const getBooking = async (bookingId: number) => {
-  const res = await axios.get<{ data: any }>(`/api/v1/bookings/${bookingId}`);
-  return res.data;
-};
+export async function getBooking(bookingId: string | number) {
+  const url = `/api/v1/bookings/${bookingId}`;
+  return axios.get<any>(url);
+}
+///////////////////////duyet anh ks//////////////// axios
+export async function loadAllModerationImage() {
+  const url = `/api/v1/files/flagged`;
+  return axios.get<any>(url);
+}
+
+export async function updateModerationImageHotel(
+  id: string | number,
+  status: ModerationStatus
+) {
+  const url = `/api/v1/files/hotel/${id}/status`;
+  return axios.patch<{
+    result: { id: string; status: ModerationStatus };
+  }>(url, { status });
+}
+
+export async function updateModerationImageRoomType(
+  id: string | number,
+  status: ModerationStatus
+) {
+  const url = `/api/v1/files/room-type/${id}/status`;
+  return axios.patch<{
+    result: { id: string; status: ModerationStatus };
+  }>(url, { status });
+}
+
+/////////////////////
+export async function loadloadImageByHotel(id:string) {
+  const url = `/api/v1/hotels/images/${id}`;
+  return axios.get<any>(url);
+}

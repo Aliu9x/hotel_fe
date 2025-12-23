@@ -1,7 +1,6 @@
 import {
   commitUpload,
   createAmenityMappings,
-  createRoomType,
   getAmenityCategory,
   getAmenityMappings,
   loadImageRoomType,
@@ -10,7 +9,6 @@ import {
 } from "@/services/api";
 import { MAX_UPLOAD_IMAGE_SIZE } from "@/services/helper";
 import { Folder } from "@/types/file.constants";
-
 import { LoadingOutlined, PlusOutlined } from "@ant-design/icons";
 import {
   App,
@@ -34,11 +32,10 @@ import type { UploadChangeParam, UploadProps } from "antd/es/upload";
 import type { UploadFile } from "antd/lib";
 import type { RcFile } from "antd/lib/upload";
 import type { UploadRequestOption as RcCustomRequestOptions } from "rc-upload/lib/interface";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
 
 type FieldType = Parameters<GetProp<UploadProps, "beforeUpload">>[0];
-
 type UserUploadType = "thumbnail" | "slider";
 
 interface IProps {
@@ -48,6 +45,8 @@ interface IProps {
   setOpenViewUpdate: (v: boolean) => void;
   refreshTable: () => void;
 }
+
+const ROOM_TYPE_SLIDER_MAX = 10;
 
 export const UpdateRoomType = (props: IProps) => {
   const {
@@ -60,15 +59,7 @@ export const UpdateRoomType = (props: IProps) => {
   const [form] = Form.useForm();
 
   const [isSubmit, setIsSubmit] = useState<boolean>();
-  const { message, notification } = App.useApp();
-  const onClose = () => [
-    setOpenViewUpdate(false),
-    form.resetFields(),
-    setFileListSlider([]),
-    setFileListThumbnail([]),
-    setSelectedAmenity([]),
-    setDataUpdate(null),
-  ];
+  const { message } = App.useApp();
 
   const [loadingThumbnail, setLoadingThumbnail] = useState<boolean>(false);
   const [loadingSlider, setLoadingSlider] = useState<boolean>(false);
@@ -78,51 +69,71 @@ export const UpdateRoomType = (props: IProps) => {
 
   const [fileListThumbnail, setFileListThumbnail] = useState<UploadFile[]>([]);
   const [fileListSlider, setFileListSlider] = useState<UploadFile[]>([]);
+
   const [categories, setCategories] = useState<ICategory[]>([]);
   const [selectedAmenity, setSelectedAmenity] = useState<string[]>([]);
-  const [dataImage, setDataImage] = useState<ILoadImage>();
+
+  const onClose = () => [
+    setOpenViewUpdate(false),
+    form.resetFields(),
+    setFileListSlider([]),
+    setFileListThumbnail([]),
+    setSelectedAmenity([]),
+    setDataUpdate(null),
+  ];
 
   const handleCheckboxChange = (id: string) => {
     setSelectedAmenity((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     );
   };
-  useEffect(() => {
-    const fetchData = async () => {
-      const res = await getAmenityCategory("ROOM");
-      if (res?.data) setCategories(res.data);
-    };
 
-    fetchData();
+  useEffect(() => {
+    (async () => {
+      try {
+        const resCatalog = await getAmenityCategory("ROOM");
+        if (resCatalog?.data) setCategories(resCatalog.data);
+      } catch {}
+    })();
   }, []);
+
   const genId = () => (crypto?.randomUUID ? crypto.randomUUID() : uuidv4());
 
+  // Load tiện ích đã chọn + ảnh hiện tại
   useEffect(() => {
     if (!dataUpdate?.id) return;
     let cancelled = false;
     (async () => {
       try {
+        // Amenity mappings
         const res = await getAmenityMappings(dataUpdate.id);
         if (!cancelled && res?.data) {
-          setCategories(res.data);
+          const selectedIds: string[] = [];
+          for (const cat of res.data as any[]) {
+            const amenities = Array.isArray(cat?.amenities)
+              ? cat.amenities
+              : [];
+            for (const a of amenities) {
+              const idStr = String(a?.amenity_id ?? a?.id ?? "").trim();
+              if (idStr) selectedIds.push(idStr);
+            }
+          }
+          const uniqueIds = Array.from(new Set(selectedIds));
+          setSelectedAmenity(uniqueIds);
         }
+
+        // Load ảnh hiện tại
         const resImage = await loadImageRoomType(dataUpdate.id);
         if (resImage && !cancelled) {
-          setDataImage(resImage.data);
-
-          const baseURL = String(
-            import.meta.env.VITE_BACKEND_URL || ""
-          ).replace(/\/+$/, "");
-          const hotelId = dataUpdate?.hotel_id;
-          const roomTypeId = dataUpdate?.id;
           const toUploadItem = (filename: string): UploadFile => ({
             uid: genId(),
             name: filename,
             status: "done",
-            url: `${baseURL}/images/hotel/${hotelId}/roomType/${roomTypeId}/${encodeURIComponent(
-              filename
-            )}`,
+            url: `${
+              import.meta.env.VITE_BACKEND_URL
+            }/images/roomType/${encodeURIComponent(filename)}`,
           });
+
           const rawThumb = resImage?.data?.thumbnail;
           const sliderNames = Array.isArray(resImage?.data?.slider)
             ? resImage.data.slider
@@ -139,6 +150,7 @@ export const UpdateRoomType = (props: IProps) => {
             )
             .map((s) => toUploadItem(s.trim()));
 
+          // Fill form và state
           form.setFieldsValue({
             id: dataUpdate.id,
             name: dataUpdate.name,
@@ -146,7 +158,6 @@ export const UpdateRoomType = (props: IProps) => {
             total_rooms: dataUpdate.total_rooms,
             max_adults: dataUpdate.max_adults,
             max_children: dataUpdate.max_children,
-            max_occupancy: dataUpdate.max_occupancy,
             bed_config: dataUpdate.bed_config,
             room_size_label: dataUpdate.room_size_label,
             floor_level: dataUpdate.floor_level,
@@ -159,35 +170,70 @@ export const UpdateRoomType = (props: IProps) => {
           setFileListThumbnail(arrThumbnail as any);
           setFileListSlider(arrSlider as any);
         }
-      } catch (e) {}
+      } catch (e) {
+        // ignore
+      }
     })();
     return () => {
       cancelled = true;
     };
-  }, [dataUpdate?.id]);
+  }, [dataUpdate?.id, form]);
 
-  const sliderFiles = fileListSlider.map((f) => ({
-    tmpFileName: f.name,
-    originalName: f.name,
-  }));
-  const thumbnailFiles = fileListThumbnail.map((f) => ({
-    tmpFileName: f.name,
-    originalName: f.name,
-  }));
+  // Chuẩn hóa payload commit như tạo mới: tập cuối cùng mong muốn (cũ + mới)
+  const thumbnailFiles = useMemo(
+    () =>
+      fileListThumbnail.map((f) => ({
+        tmpFileName: f.name,
+        originalName: f.name,
+      })),
+    [fileListThumbnail]
+  );
+
+  const sliderFiles = useMemo(
+    () =>
+      fileListSlider.map((f) => ({
+        tmpFileName: f.name,
+        originalName: f.name,
+      })),
+    [fileListSlider]
+  );
 
   const onFinish: FormProps<IRoomType>["onFinish"] = async (value) => {
     try {
       setIsSubmit(true);
+
+      // Ràng buộc ảnh
+      if (thumbnailFiles.length !== 1) {
+        message.error("Ảnh bìa phải có đúng 1 ảnh");
+        setIsSubmit(false);
+        return;
+      }
+      if (sliderFiles.length < 1) {
+        message.error("Ảnh không gian phải có ít nhất 1 ảnh");
+        setIsSubmit(false);
+        return;
+      }
+      if (sliderFiles.length > ROOM_TYPE_SLIDER_MAX) {
+        message.error(`Ảnh không gian tối đa ${ROOM_TYPE_SLIDER_MAX} ảnh`);
+        setIsSubmit(false);
+        return;
+      }
+
+      // Payload update nội dung (không liên quan ảnh)
       const payload = { ...(value as any) };
       delete payload.thumbnail;
       delete payload.slider;
       delete payload.id;
+
       const res = await updateRoomType(
         dataUpdate!.id,
         payload as Partial<IRoomType>
       );
-      if (res.data && res) {
+
+      if (res?.data) {
         await createAmenityMappings(res.data.id, selectedAmenity);
+
+        // Commit ảnh y như tạo mới (tập cuối cùng mong muốn)
         const sliderPayload = {
           folderType: Folder.ROOM_TYPE_SLIDER,
           roomTypeId: dataUpdate?.id,
@@ -217,14 +263,14 @@ export const UpdateRoomType = (props: IProps) => {
     }
   };
 
-  const getBase64 = (file: FieldType): Promise<string> => {
-    return new Promise((resolve, reject) => {
+  const getBase64 = (file: FieldType): Promise<string> =>
+    new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.readAsDataURL(file);
       reader.onload = () => resolve(reader.result as string);
       reader.onerror = (error) => reject(error);
     });
-  };
+
   const beforeUpload = (file: FieldType) => {
     const isJpgOrPng = file.type === "image/jpeg" || file.type === "image/png";
     if (!isJpgOrPng) {
@@ -253,54 +299,76 @@ export const UpdateRoomType = (props: IProps) => {
       type === "slider" ? setLoadingSlider(true) : setLoadingThumbnail(true);
       return;
     }
-
-    if (info.file.status === "done") {
+    if (
+      info.file.status === "done" ||
+      info.file.status === "error" ||
+      info.file.status === "removed"
+    ) {
       type === "slider" ? setLoadingSlider(false) : setLoadingThumbnail(false);
     }
   };
 
   const handleRemove = async (file: UploadFile, type: UserUploadType) => {
     if (type === "thumbnail") {
+      // Xóa ảnh bìa hiện tại khỏi danh sách cuối cùng
       setFileListThumbnail([]);
     }
     if (type === "slider") {
+      // Xóa ảnh không gian khỏi danh sách cuối cùng
       const newSlider = fileListSlider.filter((x) => x.uid !== file.uid);
       setFileListSlider(newSlider);
     }
   };
+
   const handleUploadFile = async (
     options: RcCustomRequestOptions,
     type: UserUploadType
   ) => {
-    const { onSuccess } = options;
-    const file = options.file as UploadFile;
+    const { onSuccess, onError } = options;
+    const file = options.file as RcFile;
+
+    type === "slider" ? setLoadingSlider(true) : setLoadingThumbnail(true);
+
     try {
-      const res = await uploadFileAPI(file, "book");
+      const res = await uploadFileAPI(file as any, "book");
       if (res?.data) {
         const uploadedFile: UploadFile = {
-          uid: file.uid,
-          name: res.data.fileUploaded,
+          uid: (file as any).uid,
+          name: res.data.fileUploaded, // tên file trong tmp -> tmpFileName khi commit
+          status: "done",
           url: `${import.meta.env.VITE_BACKEND_URL}/images/tmp/${
             res.data.fileUploaded
           }`,
         };
+
         if (type === "thumbnail") {
+          // Thay thế hoàn toàn ảnh bìa (luôn tối đa 1)
           setFileListThumbnail([uploadedFile]);
         } else {
-          setFileListSlider((prev) => [...prev, uploadedFile]);
+          // Bảo vệ giới hạn tối đa 10 ảnh không gian
+          const next = fileListSlider.length + 1;
+          if (next > ROOM_TYPE_SLIDER_MAX) {
+            message.error(`Ảnh không gian tối đa ${ROOM_TYPE_SLIDER_MAX} ảnh`);
+          } else {
+            setFileListSlider((prev) => [...prev, uploadedFile]);
+          }
         }
+
         onSuccess?.("ok");
       } else {
         message.error(res?.message || "Upload thất bại");
-        onSuccess?.("error");
+        onError?.(new Error(res?.message || "Upload thất bại"));
       }
     } catch (e) {
       message.error("Lỗi mạng khi upload");
-      onSuccess?.("error");
+      onError?.(e as any);
+    } finally {
+      type === "slider" ? setLoadingSlider(false) : setLoadingThumbnail(false);
     }
   };
 
   const normFile = (e: any) => (Array.isArray(e) ? e : e?.fileList || []);
+
   return (
     <>
       <Modal
@@ -379,17 +447,7 @@ export const UpdateRoomType = (props: IProps) => {
                 <InputNumber min={0} style={{ width: "100%" }} />
               </Form.Item>
             </Col>
-            <Col span={8}>
-              <Form.Item
-                label="Tổng số khách tối đa"
-                name="max_occupancy"
-                rules={[
-                  { required: true, message: "Nhập tổng số khách tối đa" },
-                ]}
-              >
-                <InputNumber min={1} style={{ width: "100%" }} />
-              </Form.Item>
-            </Col>
+     
           </Row>
 
           <Divider orientation="left">Cấu hình phòng</Divider>
@@ -410,6 +468,7 @@ export const UpdateRoomType = (props: IProps) => {
               </Form.Item>
             </Col>
           </Row>
+
           <Row gutter={16}>
             <Col span={12}>
               <Form.Item label="Hướng nhìn" name="view">
@@ -440,6 +499,7 @@ export const UpdateRoomType = (props: IProps) => {
               </Form.Item>
             </Col>
           </Row>
+
           <Divider orientation="left">Tiện ích loại phòng</Divider>
           {categories.map((cat) => (
             <Card key={String(cat.id)} style={{ marginBottom: 20 }}>
@@ -447,10 +507,11 @@ export const UpdateRoomType = (props: IProps) => {
               <Row gutter={[16, 16]}>
                 {(cat.amenities ?? []).map((item) => {
                   const idStr = String(item.id);
+                  const isChecked = selectedAmenity.includes(idStr);
                   return (
                     <Col span={8} key={idStr}>
                       <Checkbox
-                        checked={selectedAmenity.includes(idStr)}
+                        checked={isChecked}
                         onChange={() => handleCheckboxChange(idStr)}
                       >
                         {item.name}
@@ -470,13 +531,12 @@ export const UpdateRoomType = (props: IProps) => {
                 labelCol={{ span: 24 }}
                 label="Ảnh bìa"
                 rules={[
-                  {
-                    required: true,
-                    message: "Vui lòng nhập tải ảnh bìa",
-                  },
+                  { required: true, message: "Vui lòng nhập tải ảnh bìa" },
                 ]}
                 valuePropName="fileList"
-                getValueFromEvent={normFile}
+                getValueFromEvent={(e) =>
+                  Array.isArray(e) ? e : e?.fileList || []
+                }
               >
                 <Upload
                   listType="picture-card"
@@ -489,7 +549,10 @@ export const UpdateRoomType = (props: IProps) => {
                   beforeUpload={beforeUpload}
                   onChange={(info) => handleChange(info, "thumbnail")}
                   onPreview={handlePreview}
-                  onRemove={(file) => handleRemove(file, "thumbnail")}
+                  onRemove={(file) => {
+                    setFileListThumbnail([]);
+                  }}
+                  fileList={fileListThumbnail}
                 >
                   <div>
                     {loadingThumbnail ? <LoadingOutlined /> : <PlusOutlined />}
@@ -510,7 +573,9 @@ export const UpdateRoomType = (props: IProps) => {
                   },
                 ]}
                 valuePropName="fileList"
-                getValueFromEvent={normFile}
+                getValueFromEvent={(e) =>
+                  Array.isArray(e) ? e : e?.fileList || []
+                }
               >
                 <Upload
                   multiple
@@ -521,8 +586,14 @@ export const UpdateRoomType = (props: IProps) => {
                   }
                   beforeUpload={beforeUpload}
                   onChange={(info) => handleChange(info, "slider")}
-                  onRemove={(file) => handleRemove(file, "slider")}
+                  onRemove={(file) => {
+                    const newSlider = fileListSlider.filter(
+                      (x) => x.uid !== file.uid
+                    );
+                    setFileListSlider(newSlider);
+                  }}
                   onPreview={handlePreview}
+                  fileList={fileListSlider}
                 >
                   <div>
                     {loadingSlider ? <LoadingOutlined /> : <PlusOutlined />}
@@ -544,6 +615,7 @@ export const UpdateRoomType = (props: IProps) => {
           </div>
         </Form>
       </Modal>
+
       <Image
         style={{ display: "none" }}
         preview={{

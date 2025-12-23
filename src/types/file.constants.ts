@@ -8,10 +8,6 @@ export const Folder = {
 
 export type FolderType = (typeof Folder)[keyof typeof Folder];
 
-
-export const HotelApprovalStatus= {
-  PENDING: 'PENDING',
-  APPROVED : 'APPROVED',
-  SUSPENDED : 'SUSPENDED',
-}
-
+export type HotelApprovalStatus = "PENDING" | "APPROVED" | "SUSPENDED";
+export type Role = "CUSTOMER" | "HOTEL_OWNER";
+export type SignupMethod = "SELF" | "ADMIN_CREATED" | "HOTEL_OWNER";

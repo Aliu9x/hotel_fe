@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Card, Button, Tag, Typography, Space, Empty, message } from "antd";
+import { Card, Button, Tag, Typography, Space, Empty, App } from "antd";
 import { EnvironmentOutlined, CopyOutlined } from "@ant-design/icons";
 import "./partner.dashboard.scss";
 import { useNavigate } from "react-router-dom";
@@ -11,10 +11,16 @@ import {
 } from "@/services/partner.segistration.store";
 import { getMyHotel } from "@/services/api";
 import PartnerAvatarDropdown from "./partner.avatar.dropdown";
+import { useCurrentApp } from "../context/app.context";
 
 const { Title, Text } = Typography;
 
-type HotelStatus = "PENDING" | "APPROVED" | "IN_PROGRESS" | "NONE";
+type HotelStatus =
+  | "PENDING"
+  | "APPROVED"
+  | "IN_PROGRESS"
+  | "NONE"
+  | "SUSPENDED";
 
 interface DashboardItem {
   code?: string;
@@ -27,21 +33,24 @@ interface DashboardItem {
 }
 
 const PartnerDashboard: React.FC = () => {
+  const { user } = useCurrentApp();
+  const { message } = App.useApp();
   const navigate = useNavigate();
   const [items, setItems] = useState<DashboardItem[]>([]);
   const [loading, setLoading] = useState(false);
-  const userEmail =
-    localStorage.getItem("partnerUserEmail") || "partner@example.com";
 
   const loadData = async () => {
     setLoading(true);
     try {
-      // 1) Fetch server hotel for current user (authoritative)
       const serverHotel = await getMyHotel().catch(() => null);
 
       if (serverHotel && serverHotel.id) {
         const status: HotelStatus =
-          serverHotel.approval_status === "APPROVED" ? "APPROVED" : "PENDING";
+          serverHotel.approval_status === "APPROVED"
+            ? "APPROVED"
+            : serverHotel.approval_status === "SUSPENDED"
+            ? "SUSPENDED"
+            : "PENDING";
         const item: DashboardItem = {
           name: serverHotel.name || "(Chưa đặt tên)",
           district: serverHotel.district_name || "",
@@ -55,7 +64,6 @@ const PartnerDashboard: React.FC = () => {
         return;
       }
 
-      // 2) If no server hotel, show local “in-progress” registrations (if any)
       const codes = getRegistrationIndex();
       const mapped: DashboardItem[] = codes
         .map((c) => {
@@ -94,7 +102,7 @@ const PartnerDashboard: React.FC = () => {
   }, []);
 
   const startRegister = () => {
-    const code = generateRegistrationCode(); // numeric-only
+    const code = generateRegistrationCode();
     createEmptyRegistration(code);
     navigate(`/partner/register/${code}`);
   };
@@ -106,6 +114,10 @@ const PartnerDashboard: React.FC = () => {
     }
     if (it.status === "PENDING") {
       message.info("Khách sạn đang được duyệt. Vui lòng chờ Admin duyệt.");
+      return;
+    }
+    if (it.status === "SUSPENDED") {
+      message.info("Khách sạn bị cấm. Vui lòng liên hệ Admin để hỗ trợ");
       return;
     }
     if (it.code) {
@@ -125,11 +137,17 @@ const PartnerDashboard: React.FC = () => {
   const renderStatusTag = (status: HotelStatus) => {
     switch (status) {
       case "APPROVED":
-        return <Tag color="green">Đã duyệt</Tag>;
+        return <Tag color="green">Đang hoạt động</Tag>;
       case "PENDING":
         return <Tag color="blue">Đang duyệt</Tag>;
       case "IN_PROGRESS":
         return <Tag color="gold">Chưa hoàn tất đăng ký</Tag>;
+      case "SUSPENDED":
+        return (
+          <Tag color="red">
+            Khách sạn đang bị khóa vui lòng liên hệ với hệ thống{" "}
+          </Tag>
+        );
       default:
         return null;
     }
@@ -141,13 +159,12 @@ const PartnerDashboard: React.FC = () => {
     <div className="partner-dashboard">
       <div className="pd-header">
         <div className="pd-logo">
-          <span className="pd-logo-main">traveloka</span>
-          <span className="pd-logo-sub">TERA</span>
+          <span className="pd-logo-sub">MANAGEMENT HOTEL</span>
         </div>
         <div className="pd-actions">
           <Button type="link">Hỗ trợ ▾</Button>
           <Button type="link">VI ▾</Button>
-          <PartnerAvatarDropdown email={userEmail} />
+          <PartnerAvatarDropdown email={user?.email} />
         </div>
       </div>
 
@@ -228,6 +245,8 @@ const PartnerDashboard: React.FC = () => {
                         ? "Quản lý"
                         : it.status === "PENDING"
                         ? "Đang duyệt"
+                        : it.status === "SUSPENDED"
+                        ? "Bạn đang bị cấm"
                         : "Tiếp tục đăng ký"}
                     </Button>
                   </div>

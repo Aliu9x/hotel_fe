@@ -1,11 +1,18 @@
 // TableAmenity.tsx
 
-import { deleteAmenityCategory, getAllAmenityCategory } from "@/services/api";
+import {
+  deleteAmenityCategory,
+  getAllAmenityCategory,
+  updateAmenitySearch,
+} from "@/services/api";
 import {
   DeleteTwoTone,
   EditTwoTone,
   ExclamationCircleOutlined,
+  InfoCircleOutlined,
+  LockOutlined,
   PlusOutlined,
+  UnlockOutlined,
 } from "@ant-design/icons";
 import type { ActionType, ProColumns } from "@ant-design/pro-components";
 import { ProTable } from "@ant-design/pro-components";
@@ -29,11 +36,50 @@ const TableAmenity = () => {
   const [selectedCategory, setSelectedCategory] = useState<ICategory | null>(
     null
   );
-  // ✅ State cho Delete Modal
   const [openDeleteModal, setOpenDeleteModal] = useState(false);
   const [categoryToDelete, setCategoryToDelete] = useState<ICategory | null>(
     null
   );
+
+  const notifyResult = (updated: any) => {
+    if (updated?.show_in_search === true) {
+      message.success({
+        content: `Đã thêm "${updated.name}" vào danh sách tìm kiếm.`,
+        icon: <InfoCircleOutlined style={{ color: "#52c41a" }} />,
+      });
+    } else if (updated?.show_in_search === false) {
+      message.success({
+        content: `Đã gỡ "${updated.name}" khỏi danh sách tìm kiếm.`,
+        icon: <InfoCircleOutlined style={{ color: "#faad14" }} />,
+      });
+    } else {
+      message.info("Đã cập nhật tiện ích.");
+    }
+  };
+
+  const handleUpdateAmenityListSearch = async (
+    id: string | number,
+    active: boolean
+  ) => {
+    try {
+      const res: any = await updateAmenitySearch(String(id), active);
+      if (res?.data) {
+        const updated = res.data;
+        message.success(
+          updated.show_in_search
+            ? `Tiện ích ${updated.name} đã được chọn để tìm kiếm.`
+            : `Tiện ích ${updated.name} đã bỏ khỏi tìm kiếm.`
+        );
+        actionRef.current?.reload();
+      } else {
+        message.error("Không nhận được dữ liệu cập nhật từ máy chủ.");
+      }
+    } catch (e: any) {
+      message.error(
+        e?.response?.data?.message || e?.message || "Cập nhật thất bại."
+      );
+    }
+  };
 
   const columns: ProColumns<ICategory>[] = [
     {
@@ -75,25 +121,63 @@ const TableAmenity = () => {
       title: "Số tiện ích",
       key: "amenities_count",
       hideInSearch: true,
-      width: 120,
+      width: 140,
       render: (_, entity) => {
-        const amenitiesCount = entity.amenities?.length || 0;
+        const amenities = entity.amenities || [];
+        const total = amenities.length;
 
-        if (amenitiesCount === 0) {
+        if (total === 0) {
           return <span style={{ color: "#999" }}>0</span>;
         }
 
         const tooltipContent = (
-          <div style={{ maxWidth: 300 }}>
+          <div style={{ maxWidth: 360 }}>
             <div style={{ fontWeight: "bold", marginBottom: 8 }}>
-              Danh sách tiện ích:
+              Danh sách tiện ích (bấm để thêm vào tìm kiếm):
             </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-              {entity.amenities.map((amenity, index) => (
-                <Tag key={amenity.id || index} color="blue">
-                  {amenity.name}
-                </Tag>
-              ))}
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {amenities.map((amenity) => {
+                const alreadySelected = amenity.show_in_search === true;
+                return (
+                  <Tooltip
+                    key={amenity.id}
+                    title={
+                      alreadySelected
+                        ? "Tiện ích đã được admin chọn để tìm kiếm. Không thể thêm nữa."
+                        : "Thêm tiện ích này vào danh sách tìm kiếm"
+                    }
+                  >
+                    <Tag
+                      color={alreadySelected ? "default" : "blue"}
+                      style={{
+                        cursor: alreadySelected ? "not-allowed" : "pointer",
+                        userSelect: "none",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 6,
+                        borderStyle: alreadySelected ? "dashed" : "solid",
+                      }}
+                      onClick={() => {
+                        if (alreadySelected) {
+                          message.warning({
+                            content: `Tiện ích "${amenity.name}" đã được chọn trước đó.`,
+                            icon: <LockOutlined />,
+                          });
+                          return;
+                        }
+                        handleUpdateAmenityListSearch(amenity.id, true);
+                      }}
+                    >
+                      {amenity.name}
+                      {alreadySelected ? (
+                        <LockOutlined style={{ color: "#999" }} />
+                      ) : (
+                        <UnlockOutlined style={{ color: "#1890ff" }} />
+                      )}
+                    </Tag>
+                  </Tooltip>
+                );
+              })}
             </div>
           </div>
         );
@@ -101,8 +185,8 @@ const TableAmenity = () => {
         return (
           <Tooltip
             title={tooltipContent}
-            placement="topLeft"
-            overlayStyle={{ maxWidth: 400 }}
+            placement="topRight"
+            overlayStyle={{ maxWidth: 420 }}
           >
             <span
               style={{
@@ -113,7 +197,76 @@ const TableAmenity = () => {
                 textDecorationStyle: "dotted",
               }}
             >
-              {amenitiesCount} tiện ích
+              {total} tiện ích
+            </span>
+          </Tooltip>
+        );
+      },
+    },
+    {
+      title: "Tiện ích được chọn để tìm kiếm",
+      key: "amenities_count_search",
+      hideInSearch: true,
+      width: 280,
+      render: (_, entity) => {
+        const selected = (entity.amenities || []).filter(
+          (a) => a.show_in_search === true
+        );
+        const count = selected.length;
+
+        if (count === 0) {
+          return <span style={{ color: "#999" }}>Không có</span>;
+        }
+
+        const tooltipContent = (
+          <div style={{ maxWidth: 360 }}>
+            <div style={{ fontWeight: "bold", marginBottom: 8 }}>
+              Danh sách tiện ích đang được tìm kiếm (bấm để gỡ):
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {selected.map((amenity) => (
+                <Tooltip
+                  key={amenity.id}
+                  title="Gỡ tiện ích này khỏi danh sách tìm kiếm"
+                >
+                  <Tag
+                    color="green"
+                    style={{
+                      cursor: "pointer",
+                      userSelect: "none",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
+                    }}
+                    onClick={() =>
+                      handleUpdateAmenityListSearch(amenity.id, false)
+                    }
+                  >
+                    {amenity.name}
+                    <DeleteTwoTone twoToneColor="#fa8c16" />
+                  </Tag>
+                </Tooltip>
+              ))}
+            </div>
+          </div>
+        );
+
+        return (
+          <Tooltip
+            title={tooltipContent}
+            placement="topLeft"
+            overlayStyle={{ maxWidth: 420 }}
+          >
+            <span
+              style={{
+                color: "#1890ff",
+                cursor: "pointer",
+                fontWeight: 500,
+                textDecoration: "underline",
+                textDecorationStyle: "dotted",
+              }}
+            >
+              {count} tiện ích được chọn để tìm kiếm
             </span>
           </Tooltip>
         );
@@ -129,7 +282,7 @@ const TableAmenity = () => {
     {
       title: "Thao tác",
       hideInSearch: true,
-      width: 120,
+      width: 100,
       fixed: "right",
       render: (dom, entity) => (
         <>
@@ -149,7 +302,7 @@ const TableAmenity = () => {
               twoToneColor="#ff4d4f"
               style={{ cursor: "pointer", fontSize: 16 }}
               onClick={() => {
-                setCategoryToDelete(entity); 
+                setCategoryToDelete(entity);
                 setOpenDeleteModal(true);
               }}
             />
@@ -230,7 +383,7 @@ const TableAmenity = () => {
           <Button
             key="button"
             icon={<PlusOutlined />}
-            onClick={() => setOpenCreateModal(true)} 
+            onClick={() => setOpenCreateModal(true)}
             type="primary"
           >
             Thêm mới

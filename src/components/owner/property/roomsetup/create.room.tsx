@@ -3,7 +3,7 @@ import {
   createAmenityMappings,
   createRoomType,
   getAmenityCategory,
-  loadImageRoomType,
+  loadAllModerationImage,
   uploadFileAPI,
 } from "@/services/api";
 import { MAX_UPLOAD_IMAGE_SIZE } from "@/services/helper";
@@ -49,7 +49,7 @@ export const CreateRoomType = (props: IProps) => {
   const [form] = Form.useForm();
 
   const [isSubmit, setIsSubmit] = useState<boolean>();
-  const { message, notification } = App.useApp();
+  const { message } = App.useApp();
   const onClose = () => [
     setOpenViewCreate(false),
     form.resetFields(),
@@ -57,6 +57,12 @@ export const CreateRoomType = (props: IProps) => {
     setFileListThumbnail([]),
     setSelectedAmenity([]),
   ];
+
+  const oj = async () => {
+    const res = await loadAllModerationImage();
+    console.log(res);
+  };
+  oj();
 
   const [loadingThumbnail, setLoadingThumbnail] = useState<boolean>(false);
   const [loadingSlider, setLoadingSlider] = useState<boolean>(false);
@@ -76,7 +82,7 @@ export const CreateRoomType = (props: IProps) => {
   };
   useEffect(() => {
     const fetchData = async () => {
-      const res = await getAmenityCategory("ROOM");
+      const res = await getAmenityCategory("Room");
       if (res?.data) setCategories(res.data);
     };
 
@@ -97,7 +103,6 @@ export const CreateRoomType = (props: IProps) => {
       setIsSubmit(true);
       const res = await createRoomType(value);
       if (res.data && res) {
-
         await createAmenityMappings(res.data.id, selectedAmenity);
         const sliderPayload = {
           folderType: Folder.ROOM_TYPE_SLIDER,
@@ -204,9 +209,9 @@ export const CreateRoomType = (props: IProps) => {
       const res = await uploadFileAPI(file, "book");
       if (res?.data) {
         const uploadedFile: UploadFile = {
-          uid: (file as any).uid, // uid do Upload tạo
+          uid: (file as any).uid,
           name: res.data.fileUploaded,
-          status: "done", // Quan trọng: đánh dấu đã xong
+          status: "done",
           url: `${import.meta.env.VITE_BACKEND_URL}/images/tmp/${
             res.data.fileUploaded
           }`,
@@ -295,7 +300,7 @@ export const CreateRoomType = (props: IProps) => {
 
           <Divider orientation="left">Sức chứa</Divider>
           <Row gutter={16}>
-            <Col span={8}>
+            <Col span={12}>
               <Form.Item
                 label="Người lớn tối đa"
                 name="max_adults"
@@ -306,24 +311,13 @@ export const CreateRoomType = (props: IProps) => {
                 <InputNumber min={1} style={{ width: "100%" }} />
               </Form.Item>
             </Col>
-            <Col span={8}>
+            <Col span={12}>
               <Form.Item
                 label="Trẻ em tối đa"
                 name="max_children"
                 rules={[{ required: true, message: "Nhập số trẻ em tối đa" }]}
               >
                 <InputNumber min={0} style={{ width: "100%" }} />
-              </Form.Item>
-            </Col>
-            <Col span={8}>
-              <Form.Item
-                label="Tổng số khách tối đa"
-                name="max_occupancy"
-                rules={[
-                  { required: true, message: "Nhập tổng số khách tối đa" },
-                ]}
-              >
-                <InputNumber min={1} style={{ width: "100%" }} />
               </Form.Item>
             </Col>
           </Row>
@@ -481,7 +475,7 @@ export const CreateRoomType = (props: IProps) => {
         </Form>
       </Modal>
       <Image
-        style={{ display: "none" }} // ẩn ảnh gốc
+        style={{ display: "none" }}
         preview={{
           visible: previewOpen,
           src: previewImage,

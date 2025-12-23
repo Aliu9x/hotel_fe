@@ -19,11 +19,10 @@ import { OwnerDashBoard } from "./pages/owner/dashboard/owner.dashboard";
 import { BookingList } from "./pages/owner/booking/booking.list";
 import { RatePlansPage } from "./pages/owner/price/rate.plans";
 import { PriceFlexible } from "./pages/owner/price/price.flexible";
-import { OwnerSettings } from "./pages/owner/settings/owner.settings";
 import { OwnerReview } from "./pages/owner/dashboard/owner.reviews";
-import { RoomSetupPage } from "./pages/owner/property/room.setup";
+import { RoomSetupPage } from "./pages/owner/property/room.setup.page";
 import { CancellationPolicies } from "./pages/owner/property/cancellation.policies";
-import { HotelPolicyViewPage } from "./pages/owner/property/hotel.policy.view";
+import { HotelPolicyViewPage } from "./pages/owner/settings/hotel.policy.view.page";
 import LayoutOwner from "./components/layout/layout.owner";
 import { ManageAmenity } from "./pages/client/admin/manage.amenity";
 import ManageHotelPage from "./pages/client/admin/manage.hotel";
@@ -39,6 +38,11 @@ import BookingStep2 from "./components/booking/BookingStep2";
 import LayoutPartner from "./pages/client/partner/partner.layout";
 import PartnerDashboard from "./components/partner/partner.dashboard";
 import RegisterProperty from "./components/partner/register.property";
+import { HotelInfoPage } from "./pages/owner/settings/hotel.info.page";
+import { MediaAmenitiesPage } from "./pages/owner/settings/media.amenities.page";
+import { CustomersPage } from "./pages/client/admin/manage users/customer.page";
+import { OwnerPage } from "./pages/client/admin/manage users/owners.page";
+import { ImageModerationPage } from "./pages/client/admin/image.moderation.page";
 
 const router = createBrowserRouter([
   {
@@ -62,14 +66,6 @@ const router = createBrowserRouter([
         element: <BookPage />,
       },
       {
-        path: "/booking",
-        element: <BookingStep1 />,
-      },
-      {
-        path: "/booking/comfirm",
-        element: <BookingStep2 />,
-      },
-      {
         path: "/about",
         element: <AboutPage />,
       },
@@ -83,7 +79,14 @@ const router = createBrowserRouter([
       },
     ],
   },
-
+  {
+    path: "/booking",
+    element: <BookingStep1 />,
+  },
+  {
+    path: "/booking/confirm",
+    element: <BookingStep2 />,
+  },
   {
     path: "admin",
     element: <LayoutAdmin />,
@@ -136,12 +139,27 @@ const router = createBrowserRouter([
           </ProtectedRoute>
         ),
       },
-
-      {
-        path: "/admin",
+{
+        path: "image-moderation",
         element: (
           <ProtectedRoute>
-            <div>admin page</div>
+            <ImageModerationPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "user/customer",
+        element: (
+          <ProtectedRoute>
+            <CustomersPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "user/owner",
+        element: (
+          <ProtectedRoute>
+            <OwnerPage />
           </ProtectedRoute>
         ),
       },
@@ -171,30 +189,96 @@ const router = createBrowserRouter([
       {
         path: "booking",
         children: [
-          { index: true, element: <BookingList /> },
-          { path: "calendar", element: <InventoryPage /> },
+          {
+            index: true,
+            element: (
+              <ProtectedRoute>
+                <BookingList />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: "calendar",
+            element: (
+              <ProtectedRoute>
+                <InventoryPage />
+              </ProtectedRoute>
+            ),
+          },
         ],
       },
 
       {
         path: "price",
         children: [
-          { index: true, element: <RatePlansPage /> },
-          { path: "flexible", element: <PriceFlexible /> },
+          {
+            index: true,
+            element: (
+              <ProtectedRoute>
+                <RatePlansPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: "flexible",
+            element: (
+              <ProtectedRoute>
+                <PriceFlexible />
+              </ProtectedRoute>
+            ),
+          },
         ],
       },
       {
         path: "property",
         children: [
-          { index: true, element: <HotelPolicyViewPage /> },
-          { path: "rooms", element: <RoomSetupPage /> },
-          { path: "cancellation", element: <CancellationPolicies /> },
+          {
+            path: "rooms",
+            element: (
+              <ProtectedRoute>
+                <RoomSetupPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: "cancellation",
+            element: (
+              <ProtectedRoute>
+                <CancellationPolicies />
+              </ProtectedRoute>
+            ),
+          },
         ],
       },
 
       {
         path: "settings",
-        element: <OwnerSettings />,
+        children: [
+          {
+            path: "hotel-info",
+            element: (
+              <ProtectedRoute>
+                <HotelInfoPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: "media-amenities",
+            element: (
+              <ProtectedRoute>
+                <MediaAmenitiesPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: "policy",
+            element: (
+              <ProtectedRoute>
+                <HotelPolicyViewPage />
+              </ProtectedRoute>
+            ),
+          },
+        ],
       },
     ],
   },

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Button, Tag, Tooltip, message, Select, Space } from "antd";
-import { PlusOutlined, EyeTwoTone, EditTwoTone } from "@ant-design/icons";
+import { EyeTwoTone } from "@ant-design/icons";
 import type { ActionType, ProColumns } from "@ant-design/pro-table";
 import ProTable from "@ant-design/pro-table";
 import {
@@ -9,8 +9,6 @@ import {
   getProvinces,
   getWards,
 } from "@/services/api";
-import CreateHotel from "./create.hotel";
-import UpdateHotel from "./update.hotel";
 import DetailHotel from "./detail.hotel";
 
 interface TSearch {
@@ -24,16 +22,19 @@ interface TSearch {
 
 const TableHotel: React.FC = () => {
   const actionRef = useRef<ActionType>(undefined);
-  const [openCreate, setOpenCreate] = useState(false);
-  const [openUpdate, setOpenUpdate] = useState(false);
   const [openDetail, setOpenDetail] = useState(false);
-  const [selectedHotel, setSelectedHotel] = useState<IHotel | null>(null);
   const [detailHotel, setDetailHotel] = useState<IHotel | null>(null);
 
   // Location filters
-  const [provinceOptions, setProvinceOptions] = useState<any[]>([]);
-  const [districtOptions, setDistrictOptions] = useState<any[]>([]);
-  const [wardOptions, setWardOptions] = useState<any[]>([]);
+  const [provinceOptions, setProvinceOptions] = useState<
+    { label: string; value: number }[]
+  >([]);
+  const [districtOptions, setDistrictOptions] = useState<
+    { label: string; value: number }[]
+  >([]);
+  const [wardOptions, setWardOptions] = useState<
+    { label: string; value: number }[]
+  >([]);
   const [filterProvinceId, setFilterProvinceId] = useState<
     number | undefined
   >();
@@ -42,10 +43,21 @@ const TableHotel: React.FC = () => {
   >();
   const [filterWardId, setFilterWardId] = useState<number | undefined>();
 
+  // Star rating filter
+  const [filterStarRating, setFilterStarRating] = useState<
+    number | undefined
+  >();
+  const starOptions = [
+    { label: "⭐ 1 sao", value: 1 },
+    { label: "⭐⭐ 2 sao", value: 2 },
+    { label: "⭐⭐⭐ 3 sao", value: 3 },
+    { label: "⭐⭐⭐⭐ 4 sao", value: 4 },
+    { label: "⭐⭐⭐⭐⭐ 5 sao", value: 5 },
+  ];
+
   useEffect(() => {
     (async () => {
       try {
-        // Lấy nhiều tỉnh (limit lớn)
         const res = await getProvinces({ limit: 300 });
         const payload = res.data;
         setProvinceOptions(
@@ -60,7 +72,6 @@ const TableHotel: React.FC = () => {
     })();
   }, []);
 
-  // Khi chọn province
   useEffect(() => {
     (async () => {
       if (!filterProvinceId) {
@@ -91,7 +102,6 @@ const TableHotel: React.FC = () => {
     })();
   }, [filterProvinceId]);
 
-  // Khi chọn district
   useEffect(() => {
     (async () => {
       if (!filterDistrictId) {
@@ -134,12 +144,12 @@ const TableHotel: React.FC = () => {
       dataIndex: "name",
       copyable: true,
       ellipsis: true,
-      width: 180,
+      width: 200,
     },
     {
       title: "Hạng sao",
       dataIndex: "star_rating",
-      width: 120,
+      width: 140,
       hideInSearch: true,
       render: (_, entity) =>
         entity.star_rating ? (
@@ -156,9 +166,14 @@ const TableHotel: React.FC = () => {
       dataIndex: "address_line",
       ellipsis: true,
       hideInSearch: true,
-      width: 260,
+      width: 300,
       render: (_, e) => {
-        const address = [e.address_line, e.ward, e.district, e.city, e.province]
+        const address = [
+          e.address_line,
+          e.ward_name,
+          e.district_name,
+          e.province_name,
+        ]
           .filter(Boolean)
           .join(", ");
         return address || "-";
@@ -166,15 +181,15 @@ const TableHotel: React.FC = () => {
     },
     {
       title: "Tỉnh / Thành",
-      dataIndex: "province",
+      dataIndex: "province_name",
       hideInSearch: true,
-      width: 140,
-      render: (_, e) => e.province || "-",
+      width: 160,
+      render: (_, e) => e.province_name || "-",
     },
     {
       title: "Trạng thái",
       dataIndex: "approval_status",
-      width: 110,
+      width: 130,
       valueType: "select",
       valueEnum: {
         PENDING: { text: "Chờ duyệt" },
@@ -193,15 +208,15 @@ const TableHotel: React.FC = () => {
       title: "Ngày tạo",
       dataIndex: "created_at",
       valueType: "dateTime",
-      width: 160,
+      width: 180,
       hideInSearch: true,
       sorter: true,
     },
     {
       title: "Thao tác",
       hideInSearch: true,
-      width: 90,
-      fixed: "right",
+      width: 70,
+
       render: (_, entity) => (
         <Space>
           <Tooltip title="Xem chi tiết">
@@ -210,16 +225,6 @@ const TableHotel: React.FC = () => {
               onClick={() => {
                 setDetailHotel(entity);
                 setOpenDetail(true);
-              }}
-            />
-          </Tooltip>
-          <Tooltip title="Chỉnh sửa">
-            <EditTwoTone
-              twoToneColor="#f57800"
-              style={{ cursor: "pointer", fontSize: 16 }}
-              onClick={() => {
-                setSelectedHotel(entity);
-                setOpenUpdate(true);
               }}
             />
           </Tooltip>
@@ -257,20 +262,28 @@ const TableHotel: React.FC = () => {
           disabled={!filterDistrictId}
           options={wardOptions}
         />
-        <Button
-          type="primary"
-          icon={<PlusOutlined />}
-          onClick={() => setOpenCreate(true)}
-        >
-          Thêm khách sạn
-        </Button>
+        <Select
+          allowClear
+          placeholder="Hạng sao"
+          style={{ width: 180 }}
+          value={filterStarRating}
+          onChange={(v) => setFilterStarRating(v)}
+          options={starOptions}
+        />
         <Button
           onClick={() => {
             setFilterWardId(undefined);
             setFilterDistrictId(undefined);
             setFilterProvinceId(undefined);
+            setFilterStarRating(undefined);
             actionRef.current?.reload();
           }}
+          disabled={
+            !filterProvinceId &&
+            !filterDistrictId &&
+            !filterWardId &&
+            !filterStarRating
+          }
         >
           Reset bộ lọc
         </Button>
@@ -280,7 +293,7 @@ const TableHotel: React.FC = () => {
         actionRef={actionRef}
         rowKey="id"
         cardBordered
-        scroll={{ x: 1100 }}
+        scroll={{ x: 1200 }}
         request={async (params, sort) => {
           try {
             const query: IListHotelsParams = {
@@ -293,6 +306,7 @@ const TableHotel: React.FC = () => {
             if (filterProvinceId) query.provinceId = filterProvinceId;
             if (filterDistrictId) query.districtId = filterDistrictId;
             if (filterWardId) query.wardId = filterWardId;
+            if (filterStarRating) query.starRating = filterStarRating;
             if (sort && sort.created_at) {
               query.orderBy = "created_at";
               query.order = sort.created_at === "ascend" ? "ASC" : "DESC";
@@ -303,7 +317,7 @@ const TableHotel: React.FC = () => {
             return {
               data: payload.result || [],
               success: true,
-              total: payload.meta.total || 0,
+              total: payload.meta?.total || 0,
             };
           } catch (e) {
             message.error("Lỗi tải danh sách");
@@ -317,20 +331,6 @@ const TableHotel: React.FC = () => {
         }}
         dateFormatter="string"
         headerTitle="Danh sách khách sạn"
-      />
-      <CreateHotel
-        open={openCreate}
-        onClose={() => setOpenCreate(false)}
-        onSuccess={handleSuccess}
-      />
-      <UpdateHotel
-        open={openUpdate}
-        onClose={() => {
-          setOpenUpdate(false);
-          setSelectedHotel(null);
-        }}
-        onSuccess={handleSuccess}
-        data={selectedHotel}
       />
       <DetailHotel
         open={openDetail}

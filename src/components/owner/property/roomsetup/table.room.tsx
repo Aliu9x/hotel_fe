@@ -14,7 +14,6 @@ import { UpdateRoomType } from "./update.room";
 type TSearch = {
   name: string;
   view: string;
-  max_occupancy: string;
   createdAt: string;
   createdAtRange: string;
 };
@@ -94,17 +93,6 @@ export const TableRoomType = () => {
       title: "Diện tích ",
       dataIndex: "room_size_label",
     },
-    {
-      title: "Số khách tối đa",
-      dataIndex: "max_occupancy",
-      hideInSearch: true,
-      renderText: (text) => {
-        if (!text) return "—";
-        const trimmed = String(text).trim();
-        return /\bngười$/i.test(trimmed) ? trimmed : `${trimmed} người`;
-      },
-    },
-
     {
       title: "Ngày tạo",
       dataIndex: "created_at",

@@ -6,8 +6,8 @@ import {
   Button,
   Typography,
   message,
-  notification,
   type FormProps,
+  App,
 } from "antd";
 import { MailOutlined, LockOutlined } from "@ant-design/icons";
 import { loginApi } from "@/services/api";
@@ -22,6 +22,7 @@ type FieldType = {
 };
 
 const LoginPage = () => {
+  const { message } = App.useApp();
   const [isSubmit, setIsSubmit] = useState(false);
   const navigate = useNavigate();
   const { setIsAuthenticated, setUser, user } = useCurrentApp();

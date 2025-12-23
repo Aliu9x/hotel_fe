@@ -1,7 +1,14 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Button } from "antd";
-import { UserOutlined, LogoutOutlined, SettingOutlined } from "@ant-design/icons";
+import {
+  UserOutlined,
+  LogoutOutlined,
+  SettingOutlined,
+} from "@ant-design/icons";
 import "./partner.avatar.dropdown.scss";
+import { logoutApi } from "@/services/api";
+import { useCurrentApp } from "../context/app.context";
+import { useNavigate } from "react-router-dom";
 
 interface Props {
   email?: string;
@@ -16,6 +23,8 @@ const PartnerAvatarDropdown: React.FC<Props> = ({
 }) => {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement | null>(null);
+  const { setUser, setIsAuthenticated } = useCurrentApp();
+  const navigate = useNavigate();
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -26,6 +35,15 @@ const PartnerAvatarDropdown: React.FC<Props> = ({
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
+  const handleLogout = async () => {
+    const res = await logoutApi();
+    if (res.data) {
+      setUser(null);
+      setIsAuthenticated(false);
+      localStorage.removeItem("access_token");
+      navigate("/partner");
+    }
+  };
   return (
     <div className="pa-wrapper" ref={ref}>
       <Button
@@ -46,7 +64,7 @@ const PartnerAvatarDropdown: React.FC<Props> = ({
             <SettingOutlined /> <span>Cài đặt tài khoản</span>
           </div>
           <div className="pa-item" onClick={onLogout}>
-            <LogoutOutlined /> <span>Đăng xuất</span>
+            <LogoutOutlined /> <span onClick={handleLogout}>Đăng xuất</span>
           </div>
         </div>
       )}

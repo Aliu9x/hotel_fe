@@ -13,7 +13,7 @@ export const dateRangeValidate = (dateRange: any) => {
   return [startDate, endDate];
 };
 /////////////////////////////////hotel//////////
-export const buildGetAllHotels = (params?: string | IListHotelsParams) => {
+export const buildGetAllHotels = (params?: string | any) => {
   let queryString = "";
   if (typeof params === "string") {
     queryString = params;
@@ -53,26 +53,60 @@ export const buildAvailabilityQuery = (params: IAvailabilityParams) => {
 
 export const parseAvailabilityParamsFromURL = (search: string): Partial<IAvailabilityParams> => {
   const qs = new URLSearchParams(search);
+
   const num = (key: string): number | undefined => {
     const raw = qs.get(key);
     if (!raw) return undefined;
     const val = Number(raw);
     return Number.isNaN(val) ? undefined : val;
   };
+
+  const nums = (key: string): number[] | undefined => {
+    const items = qs.getAll(key);
+    const arr = items.map(s => Number(s)).filter(n => !Number.isNaN(n));
+    return arr.length ? arr : undefined;
+  };
+
+  const bool = (key: string): boolean | undefined => {
+    const raw = qs.get(key);
+    if (raw === null) return undefined;
+    if (raw === 'true') return true;
+    if (raw === 'false') return false;
+    return undefined;
+  };
+
+  const sort = (): 'asc' | 'desc' | undefined => {
+    const raw = qs.get('sortPrice');
+    if (raw === 'asc' || raw === 'desc') return raw;
+    return undefined;
+  };
+
   return {
     checkin: qs.get('checkin') || undefined,
     checkout: qs.get('checkout') || undefined,
-    adults: num('adul ts'),
+    adults: num('adults'),
     children: num('children'),
     rooms: num('rooms'),
     provinceId: num('provinceId'),
     districtId: num('districtId'),
     wardId: num('wardId'),
     hotelId: num('hotelId'),
-    starMin: num('starMin'),
-    starMax: num('starMax'),
-    priceMin: num('priceMin'),
-    priceMax: num('priceMax'),
-    q: qs.get('q') || undefined
+
+    // amenities: ép về number[]
+    hotelAmenityIds: nums('hotelAmenityIds'),
+    roomAmenityIds: nums('roomAmenityIds'),
+
+    // ranges
+    minPrice: num('minPrice'),
+    maxPrice: num('maxPrice'),
+    minStar: num('minStar'),
+    maxStar: num('maxStar'),
+
+    // checkboxes
+    refundableOnly: bool('refundableOnly'),
+    payAtHotelOnly: bool('payAtHotelOnly'),
+
+    // sort
+    sortPrice: sort(),
   };
 };

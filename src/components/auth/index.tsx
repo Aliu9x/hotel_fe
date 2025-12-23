@@ -20,7 +20,6 @@ export const ProtectedRoute = (props: IProps) => {
 
   const location = useLocation();
 
-  // 🔥 Chỉ fetch khi user chưa có + route này cần bảo vệ
   useEffect(() => {
     const loadAccount = async () => {
       setIsAppLoading(true);
@@ -55,7 +54,7 @@ export const ProtectedRoute = (props: IProps) => {
     );
   }
 
-  // ❗Chưa login
+
   if (isAuthenticated === false) {
     return (
       <Result
@@ -71,7 +70,6 @@ export const ProtectedRoute = (props: IProps) => {
     );
   }
 
-  // Check admin route
   const isAdminRoute = location.pathname.includes("admin");
   if (isAdminRoute && user?.role === "USER") {
     return (

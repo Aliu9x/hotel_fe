@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 
-import { Tag, Spin, Alert, Button, Collapse, Empty, message } from "antd";
-import { ArrowLeftOutlined, InfoCircleOutlined } from "@ant-design/icons";
+import { Tag, Spin, Alert, Button, Collapse, Empty, message, Rate } from "antd";
+import { ArrowLeftOutlined, EnvironmentOutlined, InfoCircleOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import "./hotel.detail.scss";
 import type {
@@ -11,6 +11,7 @@ import type {
   RatePlanPrice,
 } from "@/types/global";
 import { fetchHotelRoomTypes } from "@/services/api";
+import HotelImageGallery from "./hotel.lmage.gallery";
 
 const { Panel } = Collapse;
 
@@ -21,7 +22,6 @@ const HotelDetail: React.FC = () => {
 
   const [data, setData] = useState<HotelRoomTypesResponse | undefined>();
   const [loading, setLoading] = useState(false);
-
   const checkin = searchParams.get("checkin");
   const checkout = searchParams.get("checkout");
   const adults = Number(searchParams.get("adults"));
@@ -46,8 +46,34 @@ const HotelDetail: React.FC = () => {
       })
       .finally(() => setLoading(false));
   }, [hotelId, checkin, checkout, adults, children, rooms]);
+const hotel = (data as any)?.hotel as
+    | {
+        id: number;
+        name: string;
+        star_rating?: number;
+        address_line?: string;
+        ward?: string;
+        district?: string;
+        province?: string;
+        description?: string;
+      }
+    | undefined;
 
- 
+  // Tính giá thấp nhất trong toàn bộ rate plans
+  const minPrice = useMemo(() => {
+    if (!data?.room_types || data.room_types.length === 0) return undefined;
+    let min: number | undefined;
+    for (const rt of data.room_types) {
+      if (!rt.rate_plans) continue;
+      for (const rp of rt.rate_plans) {
+        const price = rp?.price_amount;
+        if (typeof price === "number") {
+          if (min === undefined || price < min) min = price;
+        }
+      }
+    }
+    return min;
+  }, [data]);
   const RatePlanRow: React.FC<{
     rp: RatePlanPrice;
     rt: HotelRoomTypeAvailability;
@@ -192,7 +218,50 @@ const HotelDetail: React.FC = () => {
         {!loading && data && data.room_types.length === 0 && (
           <Alert type="info" showIcon message="Chưa có loại phòng." />
         )}
+        <HotelImageGallery hotelId={Number(hotelId)} />
+           {/* HEADER THÔNG TIN KHÁCH SẠN + GIÁ THẤP NHẤT */}
+        {hotel && (
+          <div className="hotel-head-card">
+            <div className="head-left">
+              <h1 className="hotel-name">
+                {hotel.name}
+                <Tag color="geekblue" className="hotel-kind-badge">
+                  Khách Sạn
+                </Tag>
+              </h1>
+              <div className="hotel-stars">
+                <Rate disabled allowHalf={false} value={hotel.star_rating || 0} />
+              </div>
+              <div className="hotel-address">
+                <EnvironmentOutlined />
+                <span className="addr-text">
+                  {[
+                    hotel.address_line,
+                    hotel.ward,
+                    hotel.district,
+                    hotel.province,
+                  ]
+                    .filter(Boolean)
+                    .join(", ")}
+                </span>
+              </div>
+            </div>
+            <div className="head-right">
+              <div className="price-label">Giá/phòng/đêm từ</div>
+              <div className="min-price">
+                {typeof minPrice === "number"
+                  ? `${minPrice.toLocaleString("vi-VN")} VND`
+                  : "—"}
+              </div>
+              <Button className="choose-room-top" type="primary">
+                Chọn phòng
+              </Button>
+            </div>
+          </div>
+        )}
 
+        {/* ANCHOR: để sau này scroll tới danh sách phòng nếu cần */}
+        <div id="rooms"></div>
         {!loading &&
           data &&
           data.room_types.map((rt) => {

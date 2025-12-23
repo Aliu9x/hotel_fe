@@ -40,11 +40,13 @@ import PartnerAvatarDropdown from "./partner.avatar.dropdown";
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
-const { Option } = Select;
 
 type StepKey = "OVERVIEW" | "CONTRACT";
 type SubOverview = "BASIC_INFO" | "ADDRESS" | "CONTACT";
 type SubContract = "LEGAL_ENTITY_INFO" | "TERMS";
+
+const pickName = (label: any) =>
+  typeof label === "string" ? label.split(" - ").pop()?.trim() || "" : "";
 
 const RegisterProperty: React.FC = () => {
   const { code } = useParams();
@@ -66,9 +68,13 @@ const RegisterProperty: React.FC = () => {
     "BASIC_INFO"
   );
 
+  const prevProvinceRef = useRef<number | undefined>(undefined);
+  const prevDistrictRef = useRef<number | undefined>(undefined);
+
   const [provinces, setProvinces] = useState<any[]>([]);
   const [districts, setDistricts] = useState<any[]>([]);
   const [wards, setWards] = useState<any[]>([]);
+
   const province_id = Form.useWatch("province_id", formAddress);
   const district_id = Form.useWatch("district_id", formAddress);
 
@@ -86,7 +92,6 @@ const RegisterProperty: React.FC = () => {
     TERMS: false,
   };
 
-  // INIT
   useEffect(() => {
     if (!code) {
       message.error("Thiếu mã đăng ký");
@@ -112,7 +117,17 @@ const RegisterProperty: React.FC = () => {
     formTerms,
   ]);
 
-  // Provinces
+  // Khi quay lại tab ADDRESS, đồng bộ lại form từ bundle để không mất giá trị đã lưu
+  useEffect(() => {
+    if (
+      activeSub === "ADDRESS" &&
+      bundle?.data.addressInfo &&
+      Object.keys(bundle.data.addressInfo).length
+    ) {
+      formAddress.setFieldsValue(bundle.data.addressInfo);
+    }
+  }, [activeSub, bundle, formAddress]);
+
   useEffect(() => {
     (async () => {
       try {
@@ -121,7 +136,7 @@ const RegisterProperty: React.FC = () => {
         setProvinces(
           (payload?.result || []).map((p: any) => ({
             label: `${p.type} - ${p.name}`,
-            value: Number(p.id), // ensure number
+            value: Number(p.id),
           }))
         );
       } catch {
@@ -130,62 +145,86 @@ const RegisterProperty: React.FC = () => {
     })();
   }, []);
 
-  // Districts
   useEffect(() => {
     (async () => {
-      if (!province_id) {
-        setDistricts([]);
-        setWards([]);
-        formAddress.setFieldsValue({
-          district_id: undefined,
-          ward_id: undefined,
-        });
+      if (province_id === undefined || province_id === null) {
+        if (districts.length) setDistricts([]);
+        if (wards.length) setWards([]);
         return;
       }
+      if (prevProvinceRef.current === province_id) return;
+
+      prevProvinceRef.current = province_id;
+
       try {
         const res = await getDistricts({
           provinceId: province_id,
           limit: 2000,
         });
         const payload = res.data;
-        setDistricts(
-          (payload?.result || []).map((d: any) => ({
-            label: `${d.type} - ${d.name}`,
-            value: Number(d.id),
-          }))
-        );
-        setWards([]);
-        formAddress.setFieldsValue({ ward_id: undefined });
+        const newDistricts = (payload?.result || []).map((d: any) => ({
+          label: `${d.type} - ${d.name}`,
+          value: Number(d.id),
+        }));
+        setDistricts(newDistricts);
+
+        // Giữ lại district_id nếu còn tồn tại; nếu không, clear kèm district_name/ward
+        const currentDistrict = formAddress.getFieldValue("district_id");
+        if (
+          currentDistrict &&
+          !newDistricts.find((d: any) => d.value === Number(currentDistrict))
+        ) {
+          formAddress.setFieldsValue({
+            district_id: undefined,
+            ward_id: undefined,
+            district_name: undefined,
+            ward_name: undefined,
+          });
+          setWards([]);
+          prevDistrictRef.current = undefined;
+        }
       } catch {
         message.error("Không tải được quận/huyện");
       }
     })();
-  }, [province_id]);
+  }, [province_id]); // eslint-disable-line
 
-  // Wards
   useEffect(() => {
     (async () => {
-      if (!district_id) {
-        setWards([]);
-        formAddress.setFieldsValue({ ward_id: undefined });
+      if (district_id === undefined || district_id === null) {
+        if (wards.length) setWards([]);
         return;
       }
+
+      if (prevDistrictRef.current === district_id) return;
+
+      prevDistrictRef.current = district_id;
+
       try {
         const res = await getWards({ districtId: district_id, limit: 3000 });
         const payload = res.data;
-        setWards(
-          (payload?.result || []).map((w: any) => ({
-            label: `${w.type} - ${w.name}`,
-            value: Number(w.id),
-          }))
-        );
+        const newWards = (payload?.result || []).map((w: any) => ({
+          label: `${w.type} - ${w.name}`,
+          value: Number(w.id),
+        }));
+        setWards(newWards);
+
+        const currentWard = formAddress.getFieldValue("ward_id");
+        if (
+          currentWard &&
+          !newWards.find((w: any) => w.value === Number(currentWard))
+        ) {
+          formAddress.setFieldsValue({
+            ward_id: undefined,
+            ward_name: undefined,
+          });
+        }
       } catch {
         message.error("Không tải được phường/xã");
       }
     })();
-  }, [district_id]);
+  }, [district_id]); // eslint-disable-line
 
-  // Autosave
   const autoSave = useCallback(
     (section: string, values: any, flag?: string) => {
       if (!code) return;
@@ -210,7 +249,6 @@ const RegisterProperty: React.FC = () => {
     autoSave("legalEntity", formLegal.getFieldsValue(true));
   const onTermsChange = () => autoSave("terms", formTerms.getFieldsValue(true));
 
-  // Submits
   const submitBasic = async () => {
     await formBasic.validateFields();
     updateSection(
@@ -247,22 +285,35 @@ const RegisterProperty: React.FC = () => {
     message.success("Đã lưu mục Thông tin liên hệ");
   };
 
-  // Finalize overview
   const finalizeOverview = async () => {
     if (!code) return;
     try {
       await formBasic.validateFields();
       await formAddress.validateFields();
+      await formContact.validateFields();
 
-      // Lấy mọi giá trị (kể cả chưa chạm) và ép kiểu
       const b = formBasic.getFieldsValue(true);
       const a = formAddress.getFieldsValue(true);
       const c = formContact.getFieldsValue(true);
 
+      console.log("[FINALIZE] address form raw =", a);
+
       const asStr = (v: any) =>
         typeof v === "string" ? v.trim() : String(v ?? "").trim();
       const asNum = (v: any) =>
-        typeof v === "number" ? v : v ? Number(v) : undefined;
+        v === undefined || v === null
+          ? undefined
+          : typeof v === "number"
+          ? v
+          : Number(v);
+      if (a.province_id && !a.district_id) {
+        message.error("Vui lòng chọn Quận/Huyện");
+        return;
+      }
+      if (a.district_id && !a.ward_id) {
+        message.error("Vui lòng chọn Phường/Xã");
+        return;
+      }
 
       const payload = {
         registration_code: code,
@@ -284,12 +335,12 @@ const RegisterProperty: React.FC = () => {
         return;
       }
 
-      console.log("[WZ] CREATE HOTEL payload =", payload);
+      console.log("[FINALIZE] createHotel payload =", payload);
 
       const hotel = await createHotel(payload);
-      const hid = hotel?.id ?? hotel?.data?.id;
-      console.log("[WZ] CREATE HOTEL response =", hotel);
+      console.log("[FINALIZE] createHotel response =", hotel);
 
+      const hid = hotel?.id ?? hotel?.data?.id;
       if (!hid) {
         message.error("Không nhận được hotel id từ server");
         return;
@@ -304,14 +355,13 @@ const RegisterProperty: React.FC = () => {
       setActiveMain("CONTRACT");
       setActiveSub("LEGAL_ENTITY_INFO");
     } catch (e: any) {
-      console.error("[WZ] FINALIZE OVERVIEW ERROR", e);
-      const msg = Array.isArray(e?.original?.response?.data?.message)
-        ? e.original.response.data.message.join("; ")
-        : e?.message || e?.original?.message || "Lỗi hoàn tất Mục 1";
+      console.error("[FINALIZE] ERROR =", e);
+      const msg = Array.isArray(e?.response?.data?.message)
+        ? e.response.data.message.join("; ")
+        : e?.message || "Lỗi hoàn tất Mục 1";
       message.error(msg);
     }
   };
-
   const submitLegal = async () => {
     await formLegal.validateFields();
     updateSection(
@@ -348,7 +398,6 @@ const RegisterProperty: React.FC = () => {
         return;
       }
 
-      // 1) Upload files
       let uploadRes: {
         contract_pdf_filename?: string;
         identity_doc_filename?: string;
@@ -362,7 +411,6 @@ const RegisterProperty: React.FC = () => {
         setFileNames(code, uploadRes);
       }
 
-      // 2) Build contract payload
       const legal = formLegal.getFieldsValue(true);
       const contact = formContact.getFieldsValue(true);
       const filesStore = current?.data.files || {};
@@ -376,7 +424,7 @@ const RegisterProperty: React.FC = () => {
       const identityDocName =
         uploadRes.identity_doc_filename ||
         filesStore.identity_doc_filename ||
-        legal.identityDocFileName || // nếu bạn đặt ở form legal
+        legal.identityDocFileName ||
         undefined;
 
       const asStr = (v: any) =>
@@ -414,14 +462,9 @@ const RegisterProperty: React.FC = () => {
 
       console.log("[WZ] CONTRACT UPDATE payload =", payloadContract);
 
-      // 3) Update contract (token-based endpoint)
       await updateHotelContract(hotelId, payloadContract);
-
-      // 4) Submit cuối (mock/endpoint thực)
       const result = await submitRegistration(hotelId);
       setStatus(code, result.status === "APPROVED" ? "APPROVED" : "PENDING");
-
-      // 5) Clear register page & điều hướng
       if (result.status === "APPROVED") {
         message.success("Khách sạn đã được duyệt!");
         deleteRegistration(code);
@@ -440,8 +483,6 @@ const RegisterProperty: React.FC = () => {
         message.error(e?.message || e?.original?.message || "Lỗi gửi đăng ký");
     }
   };
-
-  // Flags
   const flags = bundle?.stepFlags ?? defaultFlags;
   const overviewComplete =
     flags.BASIC_INFO &&
@@ -628,39 +669,144 @@ const RegisterProperty: React.FC = () => {
                     layout="vertical"
                     onValuesChange={onAddressChange}
                   >
+                    {/* Hidden fields for names to store alongside IDs */}
+                    <Form.Item name="province_name" hidden>
+                      <Input />
+                    </Form.Item>
+                    <Form.Item name="district_name" hidden>
+                      <Input />
+                    </Form.Item>
+                    <Form.Item name="ward_name" hidden>
+                      <Input />
+                    </Form.Item>
+
                     <Form.Item name="address_line" label="Địa chỉ chi tiết">
                       <Input placeholder="Số nhà, đường..." />
                     </Form.Item>
                     <Row gutter={16}>
                       <Col span={8}>
-                        <Form.Item name="province_id" label="Tỉnh/Thành phố">
+                        <Form.Item
+                          name="province_id"
+                          label="Tỉnh/Thành phố"
+                          rules={[
+                            { required: true, message: "Chọn tỉnh/thành" },
+                          ]}
+                        >
                           <Select
                             allowClear
                             showSearch
                             placeholder="Chọn tỉnh"
                             options={provinces}
+                            filterOption={(input, option) =>
+                              (option?.label as string)
+                                .toLowerCase()
+                                .includes(input.toLowerCase())
+                            }
+                            onSelect={(_, option: any) => {
+                              formAddress.setFieldsValue({
+                                province_name: pickName(option?.label),
+                              });
+                            }}
+                            onChange={(value, option: any) => {
+                              if (!value) {
+                                // clear all dependent names + ids
+                                formAddress.setFieldsValue({
+                                  province_name: undefined,
+                                  district_id: undefined,
+                                  ward_id: undefined,
+                                  district_name: undefined,
+                                  ward_name: undefined,
+                                });
+                              }
+                            }}
                           />
                         </Form.Item>
                       </Col>
                       <Col span={8}>
-                        <Form.Item name="district_id" label="Quận/Huyện">
+                        <Form.Item
+                          name="district_id"
+                          label="Quận/Huyện"
+                          rules={[
+                            {
+                              validator: (_, v) => {
+                                if (!province_id) return Promise.resolve(); // chưa chọn tỉnh -> cho qua
+                                if (province_id && !v)
+                                  return Promise.reject(
+                                    new Error("Chọn quận/huyện")
+                                  );
+                                return Promise.resolve();
+                              },
+                            },
+                          ]}
+                        >
                           <Select
                             allowClear
                             showSearch
                             disabled={!province_id}
                             placeholder="Chọn quận/huyện"
                             options={districts}
+                            filterOption={(input, option) =>
+                              (option?.label as string)
+                                .toLowerCase()
+                                .includes(input.toLowerCase())
+                            }
+                            onSelect={(_, option: any) => {
+                              formAddress.setFieldsValue({
+                                district_name: pickName(option?.label),
+                              });
+                            }}
+                            onChange={(value) => {
+                              if (!value) {
+                                formAddress.setFieldsValue({
+                                  district_name: undefined,
+                                  ward_id: undefined,
+                                  ward_name: undefined,
+                                });
+                              }
+                            }}
                           />
                         </Form.Item>
                       </Col>
                       <Col span={8}>
-                        <Form.Item name="ward_id" label="Phường/Xã">
+                        <Form.Item
+                          name="ward_id"
+                          label="Phường/Xã"
+                          rules={[
+                            {
+                              validator: (_, v) => {
+                                if (!district_id) return Promise.resolve(); // chưa chọn quận -> cho qua
+                                if (district_id && !v)
+                                  return Promise.reject(
+                                    new Error("Chọn phường/xã")
+                                  );
+                                return Promise.resolve();
+                              },
+                            },
+                          ]}
+                        >
                           <Select
                             allowClear
                             showSearch
                             disabled={!district_id}
                             placeholder="Chọn phường/xã"
                             options={wards}
+                            filterOption={(input, option) =>
+                              (option?.label as string)
+                                .toLowerCase()
+                                .includes(input.toLowerCase())
+                            }
+                            onSelect={(_, option: any) => {
+                              formAddress.setFieldsValue({
+                                ward_name: pickName(option?.label),
+                              });
+                            }}
+                            onChange={(value) => {
+                              if (!value) {
+                                formAddress.setFieldsValue({
+                                  ward_name: undefined,
+                                });
+                              }
+                            }}
                           />
                         </Form.Item>
                       </Col>

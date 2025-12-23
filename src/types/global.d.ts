@@ -1,3 +1,5 @@
+import type { Role } from "./file.constants";
+
 export {};
 
 declare global {
@@ -28,13 +30,26 @@ declare global {
     access_token: string;
     user: IUser;
   }
+
   interface IUser {
-    email: string;
-    phone: string;
-    fullName: string;
-    role: string;
-    avatar: string;
     id: string;
+    full_name: string | null;
+    password: string | null;
+    email?: string | null;
+    phone?: string | null;
+    role: Role;
+    signup_method: SignupMethod;
+    created_at: string;
+    updatedAt: string;
+  }
+
+  interface UserQuery {
+    page?: number;
+    limit?: number;
+    q?: string;
+    role?: Role;
+    orderBy?: "created_at" | "updatedAt" | "full_name";
+    order?: "ASC" | "DESC";
   }
 
   interface IFetchAccount {
@@ -107,7 +122,6 @@ declare global {
   }
 
   interface ICreateRatePlanPayload {
-    // hotel_id sẽ set ở FE = user.hotel_id
     hotel_id: string;
     room_type_id: string;
     name: string;
@@ -142,6 +156,7 @@ declare global {
   interface IAmenity {
     id: string;
     name: string;
+    show_in_search: boolean;
     created_at: string;
     updated_at: string;
   }
@@ -194,21 +209,45 @@ declare global {
     is_active: boolean;
     amenities: Array<{ id?: string; name: string }>;
   }
-  export type HotelApprovalStatus = "PENDING" | "APPROVED" | "SUSPENDED";
 
-  export interface CreateHotelPayload {
-    registration_code: string;
-    approval_status: "PENDING" | "APPROVED";
+  interface IListHotelsParams {
+    page?: number;
+    limit?: number;
+    q?: string;
+    status?: HotelApprovalStatus;
+    provinceId?: number;
+    districtId?: number;
+    wardId?: number;
+    starRating?: number;
+    orderBy?: "created_at" | "updated_at" | "star_rating" | "name";
+    order?: "ASC" | "DESC";
+  }
+
+  interface IHotel {
+    id: string;
     name: string;
+    approval_status: HotelApprovalStatus;
     description?: string;
     star_rating?: number;
     address_line?: string;
     province_id?: number;
     district_id?: number;
     ward_id?: number;
+    province_name?: string;
+    district_name?: string;
+    ward_name?: string;
     contact_name?: string;
     contact_email?: string;
     contact_phone?: string;
+    legal_name?: string;
+    legal_address?: string;
+    signer_full_name?: string;
+    signer_phone?: string;
+    signer_email?: string;
+    identity_doc_filename?: string;
+    contract_pdf_filename?: string;
+    created_at: string;
+    updated_at: string;
   }
 
   export interface UpdateContractPayload {
@@ -224,29 +263,7 @@ declare global {
     identity_doc_filename: string;
     contract_pdf_filename?: string;
   }
-  export interface IHotel {
-    id: string;
-    name: string;
-    description?: string;
-    phone?: string;
-    email?: string;
-    address_line?: string;
-    ward?: string;
-    district?: string;
-    city?: string;
-    province?: string;
-    province_id?: number;
-    district_id?: number;
-    ward_id?: number;
-    country_code?: string;
-    timezone?: string;
-    approval_status: HotelApprovalStatus;
-    star_rating?: number;
-    created_at?: string;
-    updatedAt?: string;
-  }
 
-  // Payload tạo hotel – dùng ID, không cần truyền text province/district/ward
   interface ICreateHotelPayload {
     name: string;
     description?: string;
@@ -401,32 +418,6 @@ declare global {
   }
 }
 ////////////////////Type search/////////
-export interface RoomTypeAvailability {
-  room_type_id: number;
-  name: string;
-  description?: string;
-  capacity: {
-    max_adults: number;
-    max_children: number;
-    max_occupancy: number;
-  };
-  min_available_rooms: number;
-  total_rooms: number;
-  can_fulfill: boolean;
-  avg_price?: number;
-}
-
-export interface HotelAvailability {
-  hotel_id: number;
-  hotel_name: string;
-  star_rating?: number;
-  address_line?: string;
-  province?: string;
-  district?: string;
-  ward?: string;
-  matched_room_types: RoomTypeAvailability[];
-}
-
 export interface AvailabilityMeta {
   checkin: string;
   checkout: string;
@@ -437,26 +428,61 @@ export interface AvailabilityMeta {
   total_guests: number;
 }
 
+export interface RoomTypeAvailability {
+  room_type_id: number;
+  name: string;
+  description?: string;
+  capacity: {
+    max_adults: number;
+    max_children: number;
+    max_occupancy: number;
+  };
+  total_rooms: number;
+  can_fulfill: boolean;
+}
+
+export interface HotelAvailability {
+  hotel_id: number;
+  hotel_name: string;
+  star_rating?: number;
+  address_line?: string;
+  province?: string;
+  district?: string;
+  ward?: string;
+  hotel_min_price?: number;
+  matched_room_types: RoomTypeAvailability[];
+  image: string[];
+}
+
 export interface AvailabilityResponse {
   meta: AvailabilityMeta;
   hotels: HotelAvailability[];
 }
+
 export interface IAvailabilityParams {
   checkin: string;
   checkout: string;
   adults: number;
-  children: number;
+  children?: number;
   rooms: number;
+
+  hotelId?: number;
   provinceId?: number;
   districtId?: number;
   wardId?: number;
-  hotelId?: number;
-  starMin?: number;
-  starMax?: number;
-  priceMin?: number;
-  priceMax?: number;
-  amenityIds?: number[];
-  q?: string;
+
+  hotelAmenityIds?: number[];
+  roomAmenityIds?: number[];
+
+  minPrice?: number;
+  maxPrice?: number;
+  minStar?: number;
+  maxStar?: number;
+
+  refundableOnly?: boolean;
+  payAtHotelOnly?: boolean;
+
+  sortPrice?: "asc" | "desc";
 }
 export type SuggestType = "hotel" | "province" | "district" | "ward";
 export interface ISuggestPart {
@@ -571,6 +597,7 @@ export interface HotelRoomTypesResponse {
 
 // /////////////////////booking//////////////////
 export interface CreateBookingPayload {
+  id: string;
   hotelId: number;
   roomTypeId: number;
   ratePlanId: number;
@@ -588,4 +615,38 @@ export interface CreateBookingPayload {
   pricePerNight: number;
   prepayRequired: number;
   promoTag?: string;
+}
+export type ModerationStatus = "APPROVED" | "REJECTED";
+
+export type ImageStatus = "PENDING_AI" | "AI_FLAGGED" | "APPROVED" | "REJECTED";
+export type FlaggedItem = FlaggedHotelImage | FlaggedRoomTypeImage;
+
+export interface FlaggedHotelImage {
+  type: "HOTEL_IMAGE";
+  image_id: string;
+  file_name: string;
+  is_cover: boolean;
+  status: ImageStatus;
+  created_at: string;
+  hotel: {
+    id: string;
+    name: string;
+  };
+}
+
+export interface FlaggedRoomTypeImage {
+  type: "ROOM_TYPE_IMAGE";
+  image_id: string;
+  file_name: string;
+  is_cover: boolean;
+  status: ImageStatus;
+  created_at: string;
+  hotel: {
+    id: string;
+    name: string;
+  };
+  room_type: {
+    id: string;
+    name: string;
+  };
 }

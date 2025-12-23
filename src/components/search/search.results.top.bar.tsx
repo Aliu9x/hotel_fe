@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { Button, Col, DatePicker, Popover, Row } from "antd";
+import React, { useRef, useState } from "react";
+import { App, Button, Col, DatePicker, Popover, Row } from "antd";
 import {
   CalendarOutlined,
   SearchOutlined,
@@ -8,9 +8,11 @@ import {
 import dayjs, { Dayjs } from "dayjs";
 
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { message } from "antd";
 
-import type { IDestinationContext } from "./destination.search";
+import type {
+  IDestinationContext,
+  DestinationSearchRef,
+} from "./destination.search";
 import type { IGuestsValue } from "./guest.selector";
 import DestinationSearch from "./destination.search";
 import GuestSelector from "./guest.selector";
@@ -31,7 +33,7 @@ const SearchResultsTopBar: React.FC<Props> = ({
 }) => {
   const navigate = useNavigate();
   const [urlParams] = useSearchParams();
-
+  const { message } = App.useApp();
   const [destination, setDestination] = useState(urlParams.get("q") || "");
   const [destCtx, setDestCtx] = useState<IDestinationContext>({});
   const [dates, setDates] = useState<[Dayjs | null, Dayjs | null]>([
@@ -40,6 +42,7 @@ const SearchResultsTopBar: React.FC<Props> = ({
       ? dayjs(urlParams.get("checkout")!)
       : dayjs().add(1, "day"),
   ]);
+
   const [guests, setGuests] = useState<IGuestsValue>({
     adults:
       Number(urlParams.get("adults")) || initialAvailability?.meta.adults || 2,
@@ -56,29 +59,46 @@ const SearchResultsTopBar: React.FC<Props> = ({
   const [guestVisible, setGuestVisible] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  // Ref đến DestinationSearch để kiểm tra hợp lệ trước khi tìm kiếm
+  const destRef = useRef<DestinationSearchRef>(null);
+
   const runSearch = async () => {
+    // 1) BẮT BUỘC phải chọn từ gợi ý mới cho tìm kiếm
+    const validation = destRef.current?.validateBeforeSearch?.();
+    if (!validation || validation.ok === false) {
+      // DestinationSearch sẽ tự hiển thị "hãy nhập thêm thông tin để tìm kiếm chính xác hơn"
+      return;
+    }
+
+    // Đồng bộ state (không bắt buộc, nhưng giúp giữ nhất quán hiển thị)
+    const selectedLabel = validation.destination;
+    const selectedCtx = validation.context;
+    if (selectedLabel !== destination) setDestination(selectedLabel);
+    setDestCtx(selectedCtx);
+
+    // 2) Kiểm tra ngày (giữ nguyên giao diện và logic cũ)
     if (!dates[0] || !dates[1]) {
       message.error("Chọn ngày");
       return;
     }
-    const params: IAvailabilityParams = {
+
+    const paramsApi: IAvailabilityParams = {
       checkin: dates[0].format("YYYY-MM-DD"),
       checkout: dates[1].format("YYYY-MM-DD"),
       adults: guests.adults,
       children: guests.children,
       rooms: guests.rooms,
-      provinceId: destCtx.province_id,
-      districtId: destCtx.district_id,
-      wardId: destCtx.ward_id,
-      hotelId: destCtx.hotel_id ? Number(destCtx.hotel_id) : undefined,
-      q: destination.trim() || undefined,
+      provinceId: selectedCtx.province_id,
+      districtId: selectedCtx.district_id,
+      wardId: selectedCtx.ward_id,
+      hotelId: selectedCtx.hotel_id ? Number(selectedCtx.hotel_id) : undefined,
     };
     setLoading(true);
     try {
-      const res = await searchAvailability(params);
+      const res = await searchAvailability(paramsApi);
       const availability = res.data;
       onReload(availability);
-      const qs = buildAvailabilityQuery(params);
+      const qs = buildAvailabilityQuery(paramsApi);
       navigate(`/search-results?${qs}`, {
         replace: true,
         state: { availability },
@@ -96,8 +116,10 @@ const SearchResultsTopBar: React.FC<Props> = ({
       <div className="sr-topbar">
         <div className="sr-topbar__segment_fix sr-topbar__segment--destination">
           <DestinationSearch
+            ref={destRef}
             initialValue={destination}
             onSelectionChange={(d, ctx) => {
+              // Gõ tay => ctx rỗng, Chỉ khi chọn từ gợi ý mới có ctx đầy đủ
               setDestination(d);
               setDestCtx(ctx);
             }}

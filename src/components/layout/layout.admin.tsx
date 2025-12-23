@@ -1,16 +1,17 @@
 import React, { useState } from "react";
 import {
-  AppstoreOutlined,
   ExceptionOutlined,
   HeartTwoTone,
-  TeamOutlined,
-  UserOutlined,
   DollarCircleOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
   EnvironmentOutlined,
   PushpinOutlined,
   DashboardOutlined,
+  UserOutlined,
+  TeamOutlined,
+  HomeOutlined,
+  PictureOutlined,
 } from "@ant-design/icons";
 import { Layout, Menu, Dropdown, Space, Avatar, Result, Button } from "antd";
 import { Outlet } from "react-router-dom";
@@ -41,7 +42,24 @@ const LayoutAdmin = () => {
     {
       label: <Link to="/admin">Dashboard</Link>,
       key: "dashboard",
-      icon: <DashboardOutlined  />,
+      icon: <DashboardOutlined />,
+    },
+    {
+      label: <span>Manage users</span>,
+      key: "users",
+      icon: <UserOutlined />,
+      children: [
+        {
+          label: <Link to="/admin/user/customer">Customers</Link>,
+          key: "users-customers",
+          icon: <TeamOutlined />,
+        },
+        {
+          label: <Link to="/admin/user/owner">Hotel owners</Link>,
+          key: "users-hotel-owners",
+          icon: <HomeOutlined />,
+        },
+      ],
     },
     {
       label: <span>Manage location</span>,
@@ -75,6 +93,11 @@ const LayoutAdmin = () => {
       key: "amenity",
       icon: <ExceptionOutlined />,
     },
+    {
+      label: <Link to="/admin/image-moderation">Image Moderation</Link>,
+      key: "image-moderation",
+      icon: <PictureOutlined />,
+    },
   ];
 
   const itemsDropdown = [
@@ -100,9 +123,7 @@ const LayoutAdmin = () => {
     },
   ];
 
-  const urlAvatar = `${import.meta.env.VITE_BACKEND_URL}/images/avatar/${
-    user?.avatar
-  }`;
+  const urlAvatar = `${import.meta.env.VITE_BACKEND_URL}/images/avatar/${user}`;
 
   if (isAuthenticated === false) {
     return <Outlet />;
@@ -110,7 +131,7 @@ const LayoutAdmin = () => {
   const isAdminRoute = location.pathname.includes("admin");
   if (isAuthenticated === true && isAdminRoute === true) {
     const role = user?.role;
-    if (role === "USER") {
+    if (role === "CUSTOMER") {
       return (
         <Result
           status="403"
@@ -169,7 +190,7 @@ const LayoutAdmin = () => {
             <Dropdown menu={{ items: itemsDropdown }} trigger={["click"]}>
               <Space style={{ cursor: "pointer" }}>
                 <Avatar src={urlAvatar} />
-                {user?.fullName}
+                {user?.full_name}
               </Space>
             </Dropdown>
           </div>
@@ -177,7 +198,7 @@ const LayoutAdmin = () => {
             <Outlet />
           </Content>
           <Footer style={{ padding: 0, textAlign: "center" }}>
-            React Test Fresher &copy; Hỏi Dân IT - Made with <HeartTwoTone />
+            System Management <HeartTwoTone />
           </Footer>
         </Layout>
       </Layout>

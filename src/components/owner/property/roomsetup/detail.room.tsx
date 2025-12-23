@@ -67,6 +67,7 @@ export const DetailRoomType = (props: IProps) => {
     Boolean
   );
   const carouselRef = React.useRef<any>(null);
+
   return (
     <>
       <Drawer title={null} width={720} onClose={onClose} open={openViewDetail}>
@@ -259,7 +260,9 @@ export const DetailRoomType = (props: IProps) => {
                           }
                         >
                           <Image
-                            src={`${import.meta.env.VITE_BACKEND_URL}/images/hotel/${dataViewDetail?.hotel_id}/roomType/${dataViewDetail?.id}/${img}`}
+                            src={`${
+                              import.meta.env.VITE_BACKEND_URL
+                            }/images/roomType/${img}`}
                             alt={`hotel-img-${index}`}
                             width={240}
                             height={160}

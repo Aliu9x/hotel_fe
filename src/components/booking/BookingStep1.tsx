@@ -5,15 +5,10 @@ import {
   Input,
   Form,
   Checkbox,
-  Tag,
-  Card,
-  Divider,
-  message,
-  Steps,
+  App,
 } from "antd";
 import { createBooking } from "@/services/api";
-import "@/components/layout/app.header.scss";
-
+import "./bookingStep1.css";
 
 type Selection = {
   hotelId: number;
@@ -41,7 +36,8 @@ const readSelection = (): Selection | null => {
     return null;
   }
 };
-const writeBookingId = (id: number) => {
+
+const writeBookingId = (id: string | number) => {
   try {
     const raw = sessionStorage.getItem(STORAGE_KEY);
     const json = raw ? JSON.parse(raw) : {};
@@ -54,8 +50,8 @@ const BookingStep1: React.FC = () => {
   const navigate = useNavigate();
   const selection = readSelection();
   const redirectedOnce = useRef(false);
+  const { message } = App.useApp();
 
-  // Nếu vào /booking mà chưa có selection → về trang chủ (1 lần)
   useEffect(() => {
     if (!selection && !redirectedOnce.current) {
       redirectedOnce.current = true;
@@ -64,7 +60,7 @@ const BookingStep1: React.FC = () => {
     }
   }, [selection, navigate]);
 
-  if (!selection) return null; // đang chuyển hướng
+  if (!selection) return null;
 
   const [contactForm] = Form.useForm();
   const [guestForm] = Form.useForm();
@@ -74,11 +70,12 @@ const BookingStep1: React.FC = () => {
   const nights = useMemo(() => {
     const ci = new Date(selection.checkin);
     const co = new Date(selection.checkout);
-    return Math.round((co.getTime() - ci.getTime()) / (1000 * 60 * 60 * 24));
+    const days = Math.round((co.getTime() - ci.getTime()) / (1000 * 60 * 60 * 24));
+    return days > 0 ? days : 1;
   }, [selection]);
 
   const totalRoomPrice = selection.price * nights * selection.rooms;
-  const taxFee = Math.round(totalRoomPrice * 0.15);
+  const taxFee = Math.round(totalRoomPrice * 0.155); 
   const grandTotal = totalRoomPrice + taxFee;
 
   const toggleReq = (v: string) => {
@@ -115,150 +112,183 @@ const BookingStep1: React.FC = () => {
         promoTag: selection.promo,
       });
 
-      writeBookingId(booking.id);
-      navigate("/booking/comfirm");
+      const bookingId = booking?.data?.id;
+      writeBookingId(String(bookingId));
+
+      navigate("/booking/confirm", { replace: true });
     } catch (e: any) {
-      message.error(e?.response?.data?.message || "Không thể tạo booking");
+      message.error(
+        e?.response?.data?.message || e?.message || "Không thể tạo booking"
+      );
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="bk-step1-page global-container">
-      <div className="bk-step1-container">
-        <Steps current={1000} />
-        <div className="bk-grid">
-          <div className="bk-left" >
-            <Card className="bk-block" style={{ margin:"0 auto"}} >
-              <h3 className="bk-block-title">Liên hệ đặt chỗ</h3>
-              <Form form={contactForm} layout="vertical">
+    <div className="s1-page">
+      <header className="s1-header">
+        <div className="s1-header-inner">
+          <div className="s1-brand">
+            <img
+              // src="https://seeklogo.com/images/T/traveloka-logo-91AA3D6650-seeklogo.com.png"
+              // className="s1-logo"
+            />
+            <div className="s1-hotel-title">
+              Mia Saigon Luxury Boutique Hotel
+              {/* <span className="s1-rating">9.5/10</span>
+              <span className="s1-reviews">(362 đánh giá)</span> */}
+            </div>
+          </div>
+          <div className="s1-steps">
+            <span>Thanh toán</span>
+          </div>
+        </div>
+      </header>
+
+      <main className="s1-main">
+        <div className="s1-left">
+          {/* Liên hệ đặt chỗ */}
+          <section className="s1-section">
+            <div className="s1-section-title">
+              <span className="s1-section-icon">✉️</span>
+              Liên hệ đặt chỗ
+            </div>
+            <div className="s1-section-sub">Thêm liên hệ để nhận xác nhận đặt chỗ.</div>
+            <Form form={contactForm} layout="vertical">
+              <Form.Item
+                name="contactName"
+                label="Họ tên*"
+                rules={[{ required: true }]}
+              >
+                <Input placeholder="như trên CMND (không dấu)" />
+              </Form.Item>
+              <div className="s1-row-2">
                 <Form.Item
-                  name="contactName"
-                  label="Họ tên*"
+                  name="contactPhone"
+                  label="Điện thoại di động*"
                   rules={[{ required: true }]}
                 >
-                  <Input placeholder="Tên liên hệ" />
+                  <Input addonBefore="+84" placeholder="+84 901234567" />
                 </Form.Item>
                 <Form.Item
                   name="contactEmail"
                   label="Email*"
                   rules={[{ required: true, type: "email" }]}
                 >
-                  <Input placeholder="email@..." />
+                  <Input placeholder="email@example.com" />
                 </Form.Item>
-                <Form.Item
-                  name="contactPhone"
-                  label="Điện thoại*"
-                  rules={[{ required: true }]}
-                >
-                  <Input addonBefore="+84" placeholder="Số điện thoại" />
-                </Form.Item>
-                <Form.Item name="selfBook" valuePropName="checked" initialValue>
-                  <Checkbox>Tôi đặt cho chính mình</Checkbox>
-                </Form.Item>
-              </Form>
-            </Card>
-
-            <Card className="bk-block">
-              <h3 className="bk-block-title">Thông tin khách lưu trú</h3>
-              <Form form={guestForm} layout="vertical">
-                <Form.Item
-                  name="guestName"
-                  label="Họ tên khách*"
-                  rules={[{ required: true }]}
-                >
-                  <Input placeholder="Tên khách" />
-                </Form.Item>
-              </Form>
-            </Card>
-
-            <Card className="bk-block">
-              <h3 className="bk-block-title">Yêu cầu đặc biệt</h3>
-              <div className="bk-special-grid">
-                <Checkbox
-                  checked={specialRequests.includes("nonSmoking")}
-                  onChange={() => toggleReq("nonSmoking")}
-                >
-                  Phòng không hút thuốc
-                </Checkbox>
-                <Checkbox
-                  checked={specialRequests.includes("highFloor")}
-                  onChange={() => toggleReq("highFloor")}
-                >
-                  Tầng cao
-                </Checkbox>
-                <Checkbox
-                  checked={specialRequests.includes("lateCheckin")}
-                  onChange={() => toggleReq("lateCheckin")}
-                >
-                  Nhận phòng muộn
-                </Checkbox>
               </div>
-            </Card>
+              <Form.Item name="selfBook" valuePropName="checked" initialValue>
+                <Checkbox>Tôi đặt chỗ cho chính mình</Checkbox>
+              </Form.Item>
+            </Form>
+          </section>
 
-            {/* <Card className="bk-block">
-              <h3 className="bk-block-title">Chính sách Chỗ ở</h3>
-              <div className="bk-policy-item">
-                <Tag color="blue">Lưu ý</Tag> Xuất trình CCCD / Passport khi nhận phòng
-              </div>
-              <div className="bk-policy-item">
-                <Tag color="gold">Giấy tờ</Tag> Mang giấy tờ tùy thân hợp lệ
-              </div>
-            </Card> */}
-          </div>
+          {/* Thông tin khách hàng */}
+          <section className="s1-section">
+            <div className="s1-section-title">
+              <span className="s1-section-icon">👤</span>
+              Thông tin Khách hàng
+            </div>
+            <div className="s1-section-sub">
+              Vui lòng điền đầy đủ các thông tin để nhận xác nhận đơn hàng
+            </div>
+            <Form form={guestForm} layout="vertical">
+              <Form.Item
+                name="guestName"
+                label="Họ tên khách*"
+                rules={[{ required: true }]}
+              >
+                <Input placeholder="Tên khách" />
+              </Form.Item>
+            </Form>
+          </section>
 
-          <div className="bk-right">
-            <Card className="bk-summary-block">
-              <div className="bk-summary-section">
-                <Tag color="cyan">
-                  {selection.rooms} phòng • {nights} đêm
-                </Tag>
-                {selection.promo && <Tag color="blue">{selection.promo}</Tag>}
+          {/* Yêu cầu đặc biệt */}
+          <section className="s1-section">
+            <div className="s1-section-title">
+              <span className="s1-section-icon">⭐</span>
+              Yêu cầu đặc biệt
+            </div>
+            <div className="s1-special-grid">
+              <Checkbox
+                checked={specialRequests.includes("nonSmoking")}
+                onChange={() => toggleReq("nonSmoking")}
+              >
+                Phòng không hút thuốc
+              </Checkbox>
+              <Checkbox
+                checked={specialRequests.includes("highFloor")}
+                onChange={() => toggleReq("highFloor")}
+              >
+                Phòng liền kề
+              </Checkbox>
+              <Checkbox
+                checked={specialRequests.includes("lateCheckin")}
+                onChange={() => toggleReq("lateCheckin")}
+              >
+                Tầng lâu
+              </Checkbox>
+            </div>
+          </section>
+        </div>
+
+        {/* Right column */}
+        <aside className="s1-right">
+          <div className="s1-hotel-card">
+            <div className="s1-hotel-card-top">
+              <div className="s1-hotel-note">Bạn có lựa chọn tuyệt vời cho kỳ nghỉ của mình.</div>
+              <div className="s1-room-title">
+                (1x) Deluxe King River Front - A Symphony Of Art & Wellness Package
               </div>
-              <Divider />
-              <div className="bk-summary-section">
-                <div>Nhận: {selection.checkin}</div>
-                <div>Trả: {selection.checkout}</div>
+              <div className="s1-stay-info">
                 <div>
-                  Khách: {selection.adults} NL{" "}
-                  {selection.children > 0 && `, ${selection.children} TE`}
+                  Nhận phòng: <b>{selection.checkin}</b>
                 </div>
-                <div>RatePlan: {selection.ratePlanId}</div>
-                {selection.prepayRequired ? (
-                  <Tag color="volcano">Yêu cầu thanh toán trước</Tag>
-                ) : (
-                  <Tag color="green">Có thể thanh toán tại khách sạn</Tag>
-                )}
-              </div>
-              <Divider />
-              <div className="bk-price-detail">
-                <div className="bk-price-row">
-                  <span>Giá phòng</span>
-                  <span>{totalRoomPrice.toLocaleString("vi-VN")} VND</span>
+                <div>
+                  Trả phòng: <b>{selection.checkout}</b>
                 </div>
-                <div className="bk-price-row">
-                  <span>Thuế & phí</span>
-                  <span>{taxFee.toLocaleString("vi-VN")} VND</span>
-                </div>
-                <div className="bk-price-total">
-                  <span>Tổng cộng</span>
-                  <span className="bk-grand">
-                    {grandTotal.toLocaleString("vi-VN")} VND
-                  </span>
+                <div>
+                  {selection.adults} khách • {nights} đêm • {selection.rooms} phòng
                 </div>
               </div>
-              <Button type="primary" block size="large" loading={true}>
-                {/* onClick={handleContinue} */}
+              <div className="s1-policies">
+                <div>Miễn phí hủy phòng trước 17 thg 12 2025</div>
+                <div>Có thể đổi lịch</div>
+              </div>
+            </div>
+
+            <div className="s1-price-card">
+              <div className="s1-price-row">
+                <span>Giá phòng</span>
+                <span>{totalRoomPrice.toLocaleString("vi-VN")} VND</span>
+              </div>
+              <div className="s1-price-row">
+                <span>Thuế và phí</span>
+                <span>{taxFee.toLocaleString("vi-VN")} VND</span>
+              </div>
+              <div className="s1-price-total">
+                <div className="s1-strike">12.000.000 VND</div>
+                <div className="s1-grand">{grandTotal.toLocaleString("vi-VN")} VND</div>
+              </div>
+              <Button
+                className="s1-cta"
+                type="primary"
+                block
+                size="large"
+                loading={loading}
+                onClick={handleContinue}
+              >
                 Tiếp tục
               </Button>
-              <div className="bk-terms">
-                Tiếp tục nghĩa là bạn đồng ý Điều khoản & Chính sách.
+              <div className="s1-terms">
+                Bằng cách tiến tục thanh toán, bạn đã đồng ý với Điều khoản, Chính sách bảo mật và Quy trình Hoàn tiền lưu trú.
               </div>
-            </Card>
+            </div>
           </div>
-        </div>
-      </div>
+        </aside>
+      </main>
     </div>
   );
 };
