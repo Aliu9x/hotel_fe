@@ -44,7 +44,7 @@ export const registerApi = (
 
 export const fetchAccountApi = () => {
   const urlBackend = "/api/v1/auth/account";
-  return axios.get<IBackendRes<IFetchAccount>>(urlBackend, { headers });
+  return axios.get<any>(urlBackend, { headers });
 };
 
 export const logoutApi = () => {
@@ -61,6 +61,19 @@ export const getUserApi = (params: UserQuery) => {
 export const createUserApi = (payload: any) => {
   const urlBackend = `/api/v1/users`;
   return axios.post<any>(urlBackend, payload);
+};
+
+export const updateUserApi = (
+  id: string,
+  body: Partial<{
+    full_name: string;
+    email: string | null;
+    phone: string | null;
+    role: Role;
+    status: "SUSPENDED" | "APPROVED";
+  }>
+) => {
+  return axios.patch(`/api/v1/users/${id}`, body);
 };
 ///////////////////////////////////////////////////////////////////////////////////
 
@@ -226,44 +239,37 @@ export async function createHotel(payload: CreateHotelPayload) {
   return data;
 }
 
-export async function uploadContractFiles(
-  _unusedHotelId: number | string,
-  options: { contract_pdf?: File | null; identity_doc?: File | null }
-) {
+export async function uploadContractFiles(options: {
+  contract_pdf?: File | null;
+  identity_doc?: File | null;
+  id_hotel: string;
+}) {
   const fd = new FormData();
+  fd.append("id_hotel", options.id_hotel);
   if (options.contract_pdf) fd.append("contract_pdf", options.contract_pdf);
   if (options.identity_doc) fd.append("identity_doc", options.identity_doc);
-  console.log("[API] uploadContractFiles formData =", {
-    contract_pdf: options.contract_pdf?.name,
-    identity_doc: options.identity_doc?.name,
-  });
   const res = await axios.post("/api/v1/hotels/contract/files", fd, {
     headers: { "Content-Type": "multipart/form-data" },
   });
   const data = res.data?.data ?? res.data;
-  console.log("[API] uploadContractFiles response =", data);
   return data as {
     contract_pdf_filename?: string;
     identity_doc_filename?: string;
   };
 }
 
-export async function updateHotelContract(
-  _unusedHotelId: number | string,
-  payload: {
-    legal_name: string;
-    legal_address: string;
-    signer_full_name: string;
-    signer_phone: string;
-    signer_email: string;
-    identity_doc_filename?: string;
-    contract_pdf_filename?: string;
-  }
-) {
-  console.log("[API] updateHotelContract payload =", payload);
+export async function updateHotelContract(payload: {
+  id_hotel: string;
+  legal_name: string;
+  legal_address: string;
+  signer_full_name: string;
+  signer_phone: string;
+  signer_email: string;
+  identity_doc_filename?: string;
+  contract_pdf_filename?: string;
+}) {
   const res = await axios.put("/api/v1/hotels/contract", payload);
   const data = res.data?.data ?? res.data;
-  console.log("[API] updateHotelContract response =", data);
   return data;
 }
 
@@ -312,6 +318,11 @@ export const getAmenityMappingsHotel = () => {
   return axios.get<IBackendRes<ICategory[]>>(urlBackend);
 };
 
+export const getAmenityMappingsHotelUser = (id: string) => {
+  const urlBackend = `/api/v1/amenity-mappings/hotel`;
+  return axios.post<IBackendRes<ICategory[]>>(urlBackend, id);
+};
+
 export const getHotelPolicies = () => {
   const urlBackend = "/api/v1/hotel-policies";
   return axios.get<IBackendRes<IHotelPolicy>>(urlBackend);
@@ -341,40 +352,12 @@ export const uploadFileAPI = (fileImg: any, folder: string) => {
 };
 ////////////////////////inventories////////////
 
-export const getInventoriesRange = (params: IGetInventoryParams) => {
-  const urlBackend = `/api/v1/inventories`;
-  return axios.get<IBackendRes<IInventory[]>>(urlBackend, { params });
-};
-
-export const createInventory = (payload: ICreateInventoryPayload) => {
-  const urlBackend = `/api/v1/inventories`;
-  return axios.post<IBackendRes<IInventory>>(urlBackend, payload);
-};
-
-export const updateInventory = (
-  id: string,
-  payload: IUpdateInventoryPayload
-) => {
-  const urlBackend = `/api/v1/inventories/${id}`;
-  return axios.put<IBackendRes<IInventory>>(urlBackend, payload);
-};
-
-export const adjustInventory = (
-  id: string,
-  payload: IAdjustInventoryPayload
-) => {
-  const urlBackend = `/api/v1/inventories/${id}/adjust`;
-  return axios.patch<IBackendRes<IInventory>>(urlBackend, payload);
-};
-
-export const reserveInventory = (payload: IReserveInventoryPayload) => {
-  const urlBackend = `/api/v1/inventories/reserve`;
-  return axios.post<IBackendRes<IReserveCancelResult>>(urlBackend, payload);
-};
-
-export const cancelReservation = (payload: ICancelReservationPayload) => {
-  const urlBackend = `/api/v1/inventories/cancel`;
-  return axios.post<IBackendRes<IReserveCancelResult>>(urlBackend, payload);
+export const getInventories = (params: {
+  roomTypeId: string;
+  startDate: string; // YYYY-MM-DD
+  endDate: string; // YYYY-MM-DD
+}) => {
+  return axios.get("/api/v1/inventories", { params });
 };
 ///////////////////////////////////////////
 export const getProvinces = (params?: IListProvinceParams) =>
@@ -478,16 +461,13 @@ export const cancelHold = async (bookingId: number) => {
 };
 
 export const updatePaymentMethod = async (
-  bookingId: number,
-  paymentMethod: string
+  bookingId: string,
+  paymentType: string
 ) => {
-  const res = await axios.post<{ data: any }>(
-    "/api/v1/bookings/payment-method",
-    {
-      bookingId,
-      paymentMethod,
-    }
-  );
+  const res = await axios.post<{ data: any }>("/api/v1/bookings/payment-type", {
+    bookingId,
+    paymentType,
+  });
   return res.data;
 };
 
@@ -522,7 +502,67 @@ export async function updateModerationImageRoomType(
 }
 
 /////////////////////
-export async function loadloadImageByHotel(id:string) {
+export async function loadloadImageByHotel(id: string) {
   const url = `/api/v1/hotels/images/${id}`;
   return axios.get<any>(url);
+}
+/////////////////
+export async function createRoomCategory(name: string) {
+  const url = `/api/v1/room-type-category`;
+  return axios.post<any>(url, { name: name.trim() });
+}
+
+export async function updateRoomCategory(id: string, name: string) {
+  const url = `/api/v1/room-type-category/${id}`;
+  return axios.post<any>(url, name);
+}
+
+export async function getAllRoomCategory() {
+  const url = `/api/v1/room-type-category`;
+  return axios.get<any>(url);
+}
+
+export async function getOneRoomCategory(id: string) {
+  const url = `/api/v1/room-type-category/${id}`;
+  return axios.get<any>(url);
+}
+
+////////////////////
+export async function createRatePlanCategory(name: string) {
+  const url = `/api/v1/rate-plan-category`;
+  return axios.post<any>(url, { name: name.trim() });
+}
+
+export async function updateRatePlanCategory(id: string, name: string) {
+  const url = `/api/v1/rate-plan-category/${id}`;
+  return axios.post<any>(url, name);
+}
+
+export async function getAllRatePlanCategory() {
+  const url = `/api/v1/rate-plan-category`;
+  return axios.get<any>(url);
+}
+
+export async function getOneRatePlanCategory(id: string) {
+  const url = `/api/v1/rate-plan-category/${id}`;
+  return axios.get<any>(url);
+}
+
+////////////boooking////////////////
+
+export async function getMyBooking() {
+  const url = `/api/v1/bookings/my-bookings`;
+  return axios.get<any>(url);
+}
+
+export function getOwnerBookings(params: {
+  from?: string;
+  to?: string;
+  keyword?: string;
+}) {
+  return axios.get("/api/v1/bookings/owner-bookings", { params });
+}
+
+export function cancelBooking(id: string) {
+  return axios.patch(`/api/v1/bookings/${id}/cancel`);
 }

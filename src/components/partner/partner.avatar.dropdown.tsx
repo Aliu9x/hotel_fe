@@ -11,13 +11,13 @@ import { useCurrentApp } from "../context/app.context";
 import { useNavigate } from "react-router-dom";
 
 interface Props {
-  email?: string;
+  email?: string |null;
   onLogout?: () => void;
   onAccountSettings?: () => void;
 }
 
 const PartnerAvatarDropdown: React.FC<Props> = ({
-  email = "partner@example.com",
+  email,
   onLogout,
   onAccountSettings,
 }) => {

@@ -1,4 +1,4 @@
-import { Drawer, Descriptions, Tag } from 'antd';
+import { Drawer, Descriptions } from 'antd';
 
 interface IProps {
   open: boolean;
@@ -9,19 +9,6 @@ interface IProps {
 
 const DetailRatePlan = ({ open, onClose, data, roomTypeNameMap }: IProps) => {
   if (!data) return null;
-
-  const typeMap: Record<RatePlanType, { color: string; text: string }> = {
-    REFUNDABLE: { color: 'green', text: 'Hoàn/Hủy linh hoạt' },
-    NON_REFUNDABLE: { color: 'red', text: 'Không hoàn hủy' },
-    SEMI_FLEX: { color: 'orange', text: 'Bán linh hoạt' },
-  };
-
-  const mealMap: Record<string, string> = {
-    NONE: 'Không',
-    BREAKFAST: 'Bữa sáng',
-    HALF_BOARD: 'Bữa sáng + Bữa tối',
-    FULL_BOARD: '3 bữa',
-  };
 
   return (
     <Drawer
@@ -38,12 +25,6 @@ const DetailRatePlan = ({ open, onClose, data, roomTypeNameMap }: IProps) => {
         </Descriptions.Item>
         <Descriptions.Item label="Giá (VND)">
           {Number(data.price_amount).toLocaleString('vi-VN')}
-        </Descriptions.Item>
-        <Descriptions.Item label="Loại hoàn/hủy">
-          <Tag color={typeMap[data.type].color}>{typeMap[data.type].text}</Tag>
-        </Descriptions.Item>
-        <Descriptions.Item label="Gói bữa ăn">
-          {mealMap[data.meal_plan || 'NONE'] || '-'}
         </Descriptions.Item>
         <Descriptions.Item label="Số khách">
           Cơ bản: {data.base_occupancy} / Tối đa: {data.max_occupancy}

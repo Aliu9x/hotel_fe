@@ -38,7 +38,6 @@ interface DestinationSearchProps {
     destination: string,
     context: IDestinationContext
   ) => void;
-  // Thông báo invalid tuỳ biến (nếu muốn xử lý ngoài)
   onInvalidSearchMessage?: (msg: string) => void;
   className?: string;
 }
@@ -71,7 +70,6 @@ const DestinationSearch = React.forwardRef<
     const [highlightIndex, setHighlightIndex] = useState<number | null>(null);
     const flattenedSuggestsRef = useRef<ISuggestItem[]>([]);
 
-    // Trạng thái hợp lệ: CHỈ true khi người dùng CHỌN (click/enter) từ gợi ý
     const [isValidSelection, setIsValidSelection] = useState(false);
     const lastSelectedRef = useRef<{
       label: string;
@@ -98,7 +96,6 @@ const DestinationSearch = React.forwardRef<
         const msg = "hãy nhập thêm thông tin để tìm kiếm chính xác hơn";
         if (onInvalidSearchMessage) onInvalidSearchMessage(msg);
         else message.warning(msg);
-        // mở gợi ý để hướng người dùng chọn
         if (!openSuggest) fetchSuggest(destination);
         return { ok: false };
       },
@@ -188,9 +185,7 @@ const DestinationSearch = React.forwardRef<
       const val = e.target.value;
       setDestination(val);
       scheduleFetch(val);
-      // Gõ tay => không còn hợp lệ
       if (isValidSelection) setIsValidSelection(false);
-      // vẫn cho cha biết text đang nhập (nếu cần)
       onSelectionChange?.(val, {});
     };
 
@@ -211,7 +206,6 @@ const DestinationSearch = React.forwardRef<
       onSelectionChange?.(it.label, ctx);
     };
 
-    // tránh đóng dropdown khi click vào dropdown
     const onDropdownMouseDown = (e: React.MouseEvent) => {
       e.preventDefault();
       interactingWithDropdown.current = true;
@@ -243,9 +237,6 @@ const DestinationSearch = React.forwardRef<
       return g;
     }, [suggests]);
 
-    // Điều hướng phím + hành vi Enter:
-    // - Nếu dropdown mở và có item => Enter sẽ CHỌN gợi ý (hợp lệ).
-    // - Nếu không có lựa chọn hợp lệ => chặn submit và cảnh báo.
     const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
       const flat = flattenedSuggestsRef.current;
 
@@ -265,7 +256,6 @@ const DestinationSearch = React.forwardRef<
           if (!openSuggest) fetchSuggest(destination);
           return;
         }
-        // valid => cho phép form submit
       }
 
       if (!openSuggest || !flat.length) return;

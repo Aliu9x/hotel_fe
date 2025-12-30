@@ -1,14 +1,9 @@
 import React, { useMemo, useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
-import {
-  Button,
-  Input,
-  Form,
-  Checkbox,
-  App,
-} from "antd";
+import { useLocation, useNavigate } from "react-router-dom";
+import { Button, Input, Form, Checkbox, App } from "antd";
 import { createBooking } from "@/services/api";
 import "./bookingStep1.css";
+import type { HotelAvailability } from "@/types/global";
 
 type Selection = {
   hotelId: number;
@@ -51,6 +46,12 @@ const BookingStep1: React.FC = () => {
   const selection = readSelection();
   const redirectedOnce = useRef(false);
   const { message } = App.useApp();
+  const location = useLocation();
+
+  const hotel: HotelAvailability | undefined = location.state.h;
+
+  const nrt: any | undefined = location.state.nrt;
+  const nrp: any | undefined = location.state.nrp;
 
   useEffect(() => {
     if (!selection && !redirectedOnce.current) {
@@ -70,13 +71,11 @@ const BookingStep1: React.FC = () => {
   const nights = useMemo(() => {
     const ci = new Date(selection.checkin);
     const co = new Date(selection.checkout);
-    const days = Math.round((co.getTime() - ci.getTime()) / (1000 * 60 * 60 * 24));
+    const days = Math.round(
+      (co.getTime() - ci.getTime()) / (1000 * 60 * 60 * 24)
+    );
     return days > 0 ? days : 1;
   }, [selection]);
-
-  const totalRoomPrice = selection.price * nights * selection.rooms;
-  const taxFee = Math.round(totalRoomPrice * 0.155); 
-  const grandTotal = totalRoomPrice + taxFee;
 
   const toggleReq = (v: string) => {
     setSpecialRequests((prev) =>
@@ -107,15 +106,17 @@ const BookingStep1: React.FC = () => {
         isSelfBook: c.selfBook ? 1 : 0,
         guestName: g.guestName,
         specialRequests,
-        pricePerNight: selection.price,
-        prepayRequired: selection.prepayRequired ? 1 : 0,
+        total_price: selection.price,
         promoTag: selection.promo,
       });
 
       const bookingId = booking?.data?.id;
       writeBookingId(String(bookingId));
 
-      navigate("/booking/confirm", { replace: true });
+      navigate("/booking/confirm", {
+        replace: true,
+        state: { dataBooking: booking?.data, n: hotel },
+      });
     } catch (e: any) {
       message.error(
         e?.response?.data?.message || e?.message || "Không thể tạo booking"
@@ -124,18 +125,17 @@ const BookingStep1: React.FC = () => {
       setLoading(false);
     }
   };
-
   return (
     <div className="s1-page">
       <header className="s1-header">
         <div className="s1-header-inner">
           <div className="s1-brand">
             <img
-              // src="https://seeklogo.com/images/T/traveloka-logo-91AA3D6650-seeklogo.com.png"
-              // className="s1-logo"
+            // src="https://seeklogo.com/images/T/traveloka-logo-91AA3D6650-seeklogo.com.png"
+            // className="s1-logo"
             />
             <div className="s1-hotel-title">
-              Mia Saigon Luxury Boutique Hotel
+              {hotel?.hotel_name}
               {/* <span className="s1-rating">9.5/10</span>
               <span className="s1-reviews">(362 đánh giá)</span> */}
             </div>
@@ -154,7 +154,9 @@ const BookingStep1: React.FC = () => {
               <span className="s1-section-icon">✉️</span>
               Liên hệ đặt chỗ
             </div>
-            <div className="s1-section-sub">Thêm liên hệ để nhận xác nhận đặt chỗ.</div>
+            <div className="s1-section-sub">
+              Thêm liên hệ để nhận xác nhận đặt chỗ.
+            </div>
             <Form form={contactForm} layout="vertical">
               <Form.Item
                 name="contactName"
@@ -238,9 +240,11 @@ const BookingStep1: React.FC = () => {
         <aside className="s1-right">
           <div className="s1-hotel-card">
             <div className="s1-hotel-card-top">
-              <div className="s1-hotel-note">Bạn có lựa chọn tuyệt vời cho kỳ nghỉ của mình.</div>
+              <div className="s1-hotel-note">
+                Bạn có lựa chọn tuyệt vời cho kỳ nghỉ của mình.
+              </div>
               <div className="s1-room-title">
-                (1x) Deluxe King River Front - A Symphony Of Art & Wellness Package
+                {nrt} - {nrp}
               </div>
               <div className="s1-stay-info">
                 <div>
@@ -250,27 +254,36 @@ const BookingStep1: React.FC = () => {
                   Trả phòng: <b>{selection.checkout}</b>
                 </div>
                 <div>
-                  {selection.adults} khách • {nights} đêm • {selection.rooms} phòng
+                  {selection.adults} khách , {selection.children} trẻ em
                 </div>
               </div>
-              <div className="s1-policies">
+              {/* <div className="s1-policies">
                 <div>Miễn phí hủy phòng trước 17 thg 12 2025</div>
                 <div>Có thể đổi lịch</div>
-              </div>
+              </div> */}
             </div>
 
             <div className="s1-price-card">
               <div className="s1-price-row">
-                <span>Giá phòng</span>
-                <span>{totalRoomPrice.toLocaleString("vi-VN")} VND</span>
+                <span>Giá phòng </span>
+                <span>{selection.price.toLocaleString("vi-VN")} VND</span>
               </div>
               <div className="s1-price-row">
                 <span>Thuế và phí</span>
-                <span>{taxFee.toLocaleString("vi-VN")} VND</span>
+                <span>0 VND</span>
               </div>
-              <div className="s1-price-total">
-                <div className="s1-strike">12.000.000 VND</div>
-                <div className="s1-grand">{grandTotal.toLocaleString("vi-VN")} VND</div>
+              <div className="s1-price-row">
+                <div>
+                  <div>Tổng cộng</div>
+                  <div>
+                    {" "}
+                    {selection.rooms} phòng • {nights} đêm
+                  </div>
+                </div>
+
+                <div className="s1-grand">
+                  {selection.price.toLocaleString("vi-VN")} VND
+                </div>
               </div>
               <Button
                 className="s1-cta"
@@ -283,7 +296,8 @@ const BookingStep1: React.FC = () => {
                 Tiếp tục
               </Button>
               <div className="s1-terms">
-                Bằng cách tiến tục thanh toán, bạn đã đồng ý với Điều khoản, Chính sách bảo mật và Quy trình Hoàn tiền lưu trú.
+                Bằng cách tiến tục thanh toán, bạn đã đồng ý với Điều khoản,
+                Chính sách bảo mật và Quy trình Hoàn tiền lưu trú.
               </div>
             </div>
           </div>

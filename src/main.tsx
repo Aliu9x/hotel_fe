@@ -9,14 +9,12 @@ import { App, ConfigProvider } from "antd";
 import { AppProvider } from "components/context/app.context";
 
 import LayoutAdmin from "components/layout/layout.admin";
-import { ProtectedRoute } from "./components/auth";
 import { RegisterPage } from "./pages/client/auth/register";
 import { BookPage } from "./pages/client/book.page";
 import { AboutPage } from "./pages/client/about.page";
 import DashBoardPage from "./pages/client/admin/dashboard";
 import viVN from "antd/locale/vi_VN";
-import { OwnerDashBoard } from "./pages/owner/dashboard/owner.dashboard";
-import { BookingList } from "./pages/owner/booking/booking.list";
+import { OwnerDashBoardPage } from "./pages/owner/dashboard/owner.dashboard";
 import { RatePlansPage } from "./pages/owner/price/rate.plans";
 import { PriceFlexible } from "./pages/owner/price/price.flexible";
 import { OwnerReview } from "./pages/owner/dashboard/owner.reviews";
@@ -43,6 +41,11 @@ import { MediaAmenitiesPage } from "./pages/owner/settings/media.amenities.page"
 import { CustomersPage } from "./pages/client/admin/manage users/customer.page";
 import { OwnerPage } from "./pages/client/admin/manage users/owners.page";
 import { ImageModerationPage } from "./pages/client/admin/image.moderation.page";
+import { RoomPage } from "./pages/client/admin/manage.room.page";
+import { RoomRatePlanPage } from "./pages/client/admin/manage.rate.plans.page";
+import Retrieve from "./components/retrieve/retrieve";
+import { ProtectedRoute } from "./components/auth";
+import { BookingListPage } from "./pages/owner/booking/booking.list";
 
 const router = createBrowserRouter([
   {
@@ -58,8 +61,12 @@ const router = createBrowserRouter([
         element: <SearchResultsPage />,
       },
       {
-        path: "/hotel/:hotelId",
+        path: "/hotel-detail/:hotelId",
         element: <HotelDetailPage />,
+      },
+      {
+        path: "/retrieve",
+        element: <Retrieve />,
       },
       {
         path: "/book",
@@ -139,7 +146,16 @@ const router = createBrowserRouter([
           </ProtectedRoute>
         ),
       },
-{
+      {
+        path: "image-moderation",
+        element: (
+          <ProtectedRoute>
+            <ImageModerationPage />
+          </ProtectedRoute>
+        ),
+      },
+      //////////////////////////
+      {
         path: "image-moderation",
         element: (
           <ProtectedRoute>
@@ -148,10 +164,35 @@ const router = createBrowserRouter([
         ),
       },
       {
+        path: "image-moderation",
+        element: (
+          <ProtectedRoute>
+            <ImageModerationPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "room-types",
+        element: (
+          <ProtectedRoute>
+            <RoomPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "rate-plans",
+        element: (
+          <ProtectedRoute>
+            <RoomRatePlanPage />
+          </ProtectedRoute>
+        ),
+      },
+      //////////////////////////
+      {
         path: "user/customer",
         element: (
           <ProtectedRoute>
-            <CustomersPage />
+            <OwnerPage />
           </ProtectedRoute>
         ),
       },
@@ -159,7 +200,7 @@ const router = createBrowserRouter([
         path: "user/owner",
         element: (
           <ProtectedRoute>
-            <OwnerPage />
+            <CustomersPage />
           </ProtectedRoute>
         ),
       },
@@ -174,7 +215,7 @@ const router = createBrowserRouter([
         index: true,
         element: (
           <ProtectedRoute>
-            <OwnerDashBoard />
+            <OwnerDashBoardPage />
           </ProtectedRoute>
         ),
       },
@@ -193,7 +234,7 @@ const router = createBrowserRouter([
             index: true,
             element: (
               <ProtectedRoute>
-                <BookingList />
+                <BookingListPage />
               </ProtectedRoute>
             ),
           },
@@ -294,6 +335,7 @@ const router = createBrowserRouter([
       },
       {
         path: "register",
+
         element: <RegisterPage />,
       },
     ],

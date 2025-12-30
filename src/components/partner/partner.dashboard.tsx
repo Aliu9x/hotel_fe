@@ -3,12 +3,7 @@ import { Card, Button, Tag, Typography, Space, Empty, App } from "antd";
 import { EnvironmentOutlined, CopyOutlined } from "@ant-design/icons";
 import "./partner.dashboard.scss";
 import { useNavigate } from "react-router-dom";
-import {
-  generateRegistrationCode,
-  createEmptyRegistration,
-  getRegistrationIndex,
-  loadRegistration,
-} from "@/services/partner.segistration.store";
+import { generateRegistrationCode } from "@/services/partner.segistration.store";
 import { getMyHotel } from "@/services/api";
 import PartnerAvatarDropdown from "./partner.avatar.dropdown";
 import { useCurrentApp } from "../context/app.context";
@@ -63,33 +58,6 @@ const PartnerDashboard: React.FC = () => {
         setLoading(false);
         return;
       }
-
-      const codes = getRegistrationIndex();
-      const mapped: DashboardItem[] = codes
-        .map((c) => {
-          const reg = loadRegistration(c);
-          if (!reg) return null;
-          const status: HotelStatus =
-            reg.meta.status === "APPROVED"
-              ? "APPROVED"
-              : reg.meta.status === "PENDING"
-              ? "PENDING"
-              : "IN_PROGRESS";
-          return {
-            code: reg.meta.code,
-            name: reg.data.basicInfo?.name || "(Chưa đặt tên)",
-            district: reg.data.addressInfo?.district_id
-              ? `District ${reg.data.addressInfo?.district_id}`
-              : "",
-            country: "VIETNAM",
-            updatedAt: reg.meta.updatedAt,
-            status,
-            hotelId: reg.meta.hotelId,
-          };
-        })
-        .filter(Boolean) as DashboardItem[];
-
-      setItems(mapped.length > 0 ? mapped : []);
     } catch (e: any) {
       message.error(e?.message || "Không tải được dữ liệu dashboard");
       setItems([]);
@@ -103,7 +71,6 @@ const PartnerDashboard: React.FC = () => {
 
   const startRegister = () => {
     const code = generateRegistrationCode();
-    createEmptyRegistration(code);
     navigate(`/partner/register/${code}`);
   };
 

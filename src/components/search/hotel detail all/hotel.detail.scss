@@ -490,8 +490,8 @@
 
 .gallery-grid {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1fr; 
-  grid-template-rows: 150px 150px;     
+  grid-template-columns: 2fr 1fr 1fr 1fr;
+  grid-template-rows: 150px 150px;
   gap: 10px;
 }
 
@@ -503,12 +503,12 @@
   cursor: pointer;
   border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 4px 14px -6px rgba(0,0,0,0.18);
-  transition: transform .15s ease, box-shadow .15s ease;
+  box-shadow: 0 4px 14px -6px rgba(0, 0, 0, 0.18);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 .gallery-tile:hover {
   transform: translateY(-1px);
-  box-shadow: 0 10px 24px -10px rgba(0,0,0,0.28);
+  box-shadow: 0 10px 24px -10px rgba(0, 0, 0, 0.28);
 }
 .gallery-tile img {
   display: block;
@@ -519,23 +519,22 @@
 
 .gallery-tile.cover {
   grid-column: 1 / span 1; /* cột đầu */
-  grid-row: 1 / span 2;    /* chiếm 2 hàng */
+  grid-row: 1 / span 2; /* chiếm 2 hàng */
   border-radius: 16px;
 }
 
 .show-all-overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(0deg, rgba(0,0,0,.55), rgba(0,0,0,.15));
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0.15));
   color: #fff;
   font-weight: 700;
   font-size: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
-  letter-spacing: .2px;
+  letter-spacing: 0.2px;
 }
-
 
 /* Responsive */
 @media (max-width: 1100px) {
@@ -559,4 +558,356 @@
     grid-column: 1 / -1;
     grid-row: 1 / span 1;
   }
+}
+
+/* ====== ADDITIONS for header card styling and new "Phòng" column ====== */
+
+/* Khung nổi cho phần tên + sao + địa chỉ */
+.hotel-head-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 20px 24px;
+}
+
+.hotel-name {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  color: var(--text-dark);
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  line-height: 1.2;
+}
+
+.hotel-kind-badge {
+  margin-left: 6px;
+}
+
+.hotel-stars {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.hotel-stars-text {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 600;
+  background: #f3f6fb;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--card-border);
+}
+
+.hotel-address {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 10px 12px;
+  background: linear-gradient(90deg, #f6f9ff 0%, #ffffff 100%);
+  border: 1px dashed #d7e1ef;
+  border-radius: 12px;
+}
+
+.addr-icon {
+  color: var(--accent-blue);
+}
+
+.addr-text {
+  font-size: 13px;
+  color: #2b3a4a;
+  font-weight: 600;
+}
+
+/* Right side in header */
+.head-right {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  min-width: 240px;
+  align-items: flex-end;
+}
+.price-label {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.min-price {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--accent-orange);
+}
+.choose-room-top {
+  margin-top: 6px;
+}
+
+/* Thêm 1 cột "Phòng" cho bảng gói giá */
+.rp-table-header {
+  grid-template-columns: minmax(0, 1fr) 120px 110px 180px 110px;
+}
+.rp-row {
+  grid-template-columns: minmax(0, 1fr) 120px 110px 180px 110px;
+}
+.col-rooms {
+  text-align: left;
+}
+.rp-rooms {
+  align-items: flex-start;
+  gap: 4px;
+}
+.rp-rooms-count {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+/* Responsive update với cột mới */
+@media (max-width: 1100px) {
+  .rp-table-header,
+  .rp-row {
+    grid-template-columns: minmax(0, 1fr) 90px 90px 150px 90px;
+  }
+}
+
+/* Giữ nguyên mobile: auto stack 1 cột như trước */
+/* Tooltip price breakdown */
+.price-tooltip .ant-tooltip-inner {
+  background: #0b2f68;
+  color: #ffffff;
+  border-radius: 10px;
+  box-shadow: 0 10px 24px -10px rgba(0, 0, 0, 0.35);
+  padding: 12px 14px;
+  min-width: 260px;
+}
+.pt-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.pt-title {
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.2px;
+}
+.pt-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 14px;
+  font-size: 13px;
+}
+.pt-row span:last-child {
+  font-weight: 700;
+}
+.pt-sep {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.25);
+  margin: 2px 0;
+}
+.pt-total span:last-child {
+  color: #ffbf66;
+}
+
+.rp-current-price {
+  cursor: help;
+}
+.amenities-section {
+  margin-top: 24px;
+  padding: 16px;
+  background: #f7f9fc;
+  border-radius: 12px;
+  border: 1px solid #eef2f7;
+}
+
+.amenities-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+
+  .amenities-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: #183153;
+    margin: 0;
+  }
+
+  .amenities-sub {
+    color: #6f7b8f;
+    font-size: 13px;
+  }
+}
+
+.amenities-grid {
+  display: grid;
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+  gap: 12px;
+
+  @media (min-width: 640px) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  @media (min-width: 1024px) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.amenity-card {
+  background: #fff;
+  border: 1px solid #e9eef5;
+  border-radius: 12px;
+  padding: 12px 14px;
+  transition: box-shadow 0.2s ease, transform 0.1s ease;
+
+  &:hover {
+    box-shadow: 0 6px 20px rgba(24, 49, 83, 0.08);
+    transform: translateY(-1px);
+  }
+
+  &__header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+
+  &__icon {
+    display: inline-flex;
+    width: 28px;
+    height: 28px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    background: #eaf1ff;
+    color: #1769ff;
+
+    .anticon {
+      font-size: 16px;
+      line-height: 1;
+    }
+  }
+
+  &__title {
+    font-size: 16px;
+    font-weight: 700;
+    color: #1f2d3d;
+    margin: 0;
+  }
+
+  &__list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+
+    li {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 0;
+      border-bottom: 1px dashed #eef2f7;
+
+      &:last-child {
+        border-bottom: none;
+      }
+
+      .amenity-check {
+        color: #22c55e;
+      }
+
+      .amenity-name {
+        color: #2c3e50;
+      }
+    }
+  }
+}
+
+
+/* Slider ảnh phòng: làm nhỏ lại overall */
+.room-image-slider {
+  position: relative;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #f0f2f5;
+  max-width: 520px;        /* thu hẹp khung hiển thị */
+}
+
+/* Chiều cao ảnh giảm xuống */
+.room-image-slider .room-image-slide {
+  width: 100%;
+  height: 240px;           /* trước là 360px -> giảm */
+}
+
+.room-image-slider .room-image-slide img {
+  width: 100%;
+  height: 240px;           /* đồng bộ với slide */
+  object-fit: cover;
+  display: block;
+}
+
+/* Dots nhỏ hơn */
+.room-image-slider .slick-dots {
+  bottom: 6px;
+}
+.room-image-slider .slick-dots li {
+  width: 6px;
+  height: 6px;
+  margin: 0 3px;
+}
+.room-image-slider .slick-dots li button {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.85);
+  opacity: 1;
+}
+.room-image-slider .slick-dots .slick-active button {
+  background: #1769ff;
+}
+
+/* Nút điều hướng nhỏ lại */
+.room-image-slider .nav-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  border: none;
+  width: 30px;             /* trước ~36px -> giảm */
+  height: 30px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.35);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+.room-image-slider .nav-btn.prev { left: 8px; }
+.room-image-slider .nav-btn.next { right: 8px; }
+.room-image-slider .nav-btn:hover { background: rgba(0, 0, 0, 0.5); }
+.room-image-slider .nav-btn .anticon { font-size: 14px; }
+
+/* Responsive: càng nhỏ màn hình, càng giảm chiều cao */
+@media (max-width: 992px) {
+  .room-image-slider { max-width: 480px; }
+  .room-image-slider .room-image-slide,
+  .room-image-slider .room-image-slide img { height: 220px; }
+}
+@media (max-width: 768px) {
+  .room-image-slider { max-width: 440px; }
+  .room-image-slider .room-image-slide,
+  .room-image-slider .room-image-slide img { height: 200px; }
+}
+@media (max-width: 576px) {
+  .room-image-slider { max-width: 100%; }
+  .room-image-slider .room-image-slide,
+  .room-image-slider .room-image-slide img { height: 180px; }
 }

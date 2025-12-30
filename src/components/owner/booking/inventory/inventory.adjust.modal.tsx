@@ -20,12 +20,10 @@ export const InventoryAdjustModal: React.FC<InventoryAdjustModalProps> = ({
 }) => {
   const [form] = Form.useForm<IAdjustInventoryPayload>();
 
-  // Reset form khi inventory thay đổi / modal mở
   useEffect(() => {
     if (open) form.resetFields();
   }, [open, form]);
 
-  // Theo dõi mọi field để biết người dùng đã nhập gì chưa
   const watchAll = Form.useWatch([], form);
   const hasAnyValue = useMemo(() => {
     if (!watchAll) return false;
@@ -35,9 +33,6 @@ export const InventoryAdjustModal: React.FC<InventoryAdjustModalProps> = ({
   }, [watchAll]);
 
   const handleFinish = async (values: IAdjustInventoryPayload) => {
-    // Log để chắc onSubmit được gọi
-    // eslint-disable-next-line no-console
-    console.log("[InventoryAdjustModal] submit payload:", values);
     await onSubmit(values);
   };
 
@@ -56,11 +51,10 @@ export const InventoryAdjustModal: React.FC<InventoryAdjustModalProps> = ({
       }
       onCancel={onCancel}
       okText="Lưu"
-      // Dùng form.submit để kích hoạt validate + onFinish
       onOk={() => form.submit()}
       confirmLoading={loading}
       destroyOnClose
-      okButtonProps={{ disabled: !hasAnyValue }} // Không cho Lưu khi chưa nhập gì
+      okButtonProps={{ disabled: !hasAnyValue }}
     >
       <Form form={form} layout="vertical" onFinish={handleFinish}>
         <Text strong>Gán cứng (override)</Text>

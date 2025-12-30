@@ -1,4 +1,4 @@
-import type { Role } from "./file.constants";
+import type { Role, UserStatus } from "./file.constants";
 
 export {};
 
@@ -39,6 +39,7 @@ declare global {
     phone?: string | null;
     role: Role;
     signup_method: SignupMethod;
+    status?: UserStatus;
     created_at: string;
     updatedAt: string;
   }
@@ -72,6 +73,7 @@ declare global {
 
   interface IRoomType {
     id: string;
+    id_category: string;
     hotel_id: string;
     name: string;
     description?: string | null;
@@ -99,6 +101,7 @@ declare global {
     hotel_id: string;
     room_type_id: string;
     name: string;
+    rate_plan_category_id: string;
     price_amount: string;
     description?: string;
     meal_plan?: MealPlanType;
@@ -124,11 +127,9 @@ declare global {
   interface ICreateRatePlanPayload {
     hotel_id: string;
     room_type_id: string;
-    name: string;
+    rate_plan_category_id: string;
     price_amount: string;
     description?: string;
-    meal_plan?: MealPlanType;
-    type: RatePlanType;
     base_occupancy: number;
     max_occupancy: number;
     extra_adult_fee: string;
@@ -428,32 +429,6 @@ export interface AvailabilityMeta {
   total_guests: number;
 }
 
-export interface RoomTypeAvailability {
-  room_type_id: number;
-  name: string;
-  description?: string;
-  capacity: {
-    max_adults: number;
-    max_children: number;
-    max_occupancy: number;
-  };
-  total_rooms: number;
-  can_fulfill: boolean;
-}
-
-export interface HotelAvailability {
-  hotel_id: number;
-  hotel_name: string;
-  star_rating?: number;
-  address_line?: string;
-  province?: string;
-  district?: string;
-  ward?: string;
-  hotel_min_price?: number;
-  matched_room_types: RoomTypeAvailability[];
-  image: string[];
-}
-
 export interface AvailabilityResponse {
   meta: AvailabilityMeta;
   hotels: HotelAvailability[];
@@ -531,26 +506,43 @@ export interface HotelRoomTypeDaily {
   effective_available: number;
 }
 
-export interface RatePlanPrice {
+export type RatePlanPrice = {
   rate_plan_id: number;
   name: string;
   description?: string;
-  meal_plan?: string;
-  type?: string;
-  base_occupancy: number;
-  max_occupancy: number;
-  extra_adult_fee: number;
-  extra_child_fee: number;
   prepayment_required: boolean;
   price_amount: number;
-  extra_adults: number;
-  extra_children: number;
   nightly_total: number;
   stay_total: number;
-  available_for_request: boolean;
-  refundable: boolean;
-}
+};
 
+export type RoomTypeAvailability = {
+  room_type_id: number;
+  name: string;
+  description?: string;
+  bed_config?: string;
+  floor_level?: string;
+  smoking_allowed?: boolean;
+  view?: string;
+  best_price?: number;
+  total_rooms: number;
+  max_occupancy: number;
+  rate_plans: RatePlanPrice[];
+};
+
+export type HotelAvailability = {
+  province: string;
+  district: string;
+  ward: string;
+  hotel_id: number;
+  hotel_name: string;
+  star_rating?: number;
+  address_line?: string;
+  hotel_min_price?: number;
+  images?: string[];
+  matched_room_types: RoomTypeAvailability[];
+  amenity:any
+};
 export interface HotelRoomTypeAvailability {
   room_type_id: number;
   name: string;

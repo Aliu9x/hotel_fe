@@ -1,6 +1,6 @@
 import React from "react";
 import { FaReact } from "react-icons/fa";
-import { Avatar, Button, Divider, Dropdown, Menu, Space } from "antd";
+import { Avatar, Button, Divider, Dropdown, Space } from "antd";
 import {
   DownOutlined,
   QuestionCircleOutlined,
@@ -17,19 +17,34 @@ const AppHeader: React.FC = () => {
   const { isAuthenticated, user, setIsAuthenticated, setUser } =
     useCurrentApp();
 
-  const handlePartner = () => {
-    navigate("/partner");
-  };
+  const handlePartner = () => navigate("/partner");
+  const handleRetrieve = () => navigate("/retrieve");
+
   const handleLogout = async () => {
-    const res = await logoutApi();
-    if (res.data) {
+    try {
+      const res = await logoutApi();
+      if (res?.data) {
+        setUser(null);
+        setIsAuthenticated(false);
+        localStorage.removeItem("access_token");
+        navigate("/"); // tùy ý
+      }
+    } catch {
+      // ignore
       setUser(null);
       setIsAuthenticated(false);
       localStorage.removeItem("access_token");
+      navigate("/");
     }
   };
 
-  let userMenuItems = [
+  const userMenuItems = [
+    ...(user?.role === "ADMIN"
+      ? [{ label: <Link to="/admin">Trang quản trị</Link>, key: "admin" }]
+      : []),
+    ...(user?.role === "HOTEL_OWNER"
+      ? [{ label: <Link to="/owner">Trang quản trị</Link>, key: "owner" }]
+      : []),
     {
       label: (
         <label style={{ cursor: "pointer" }} onClick={() => alert("me")}>
@@ -47,21 +62,9 @@ const AppHeader: React.FC = () => {
       key: "logout",
     },
   ];
-  if (user?.role === "ADMIN") {
-    userMenuItems.unshift({
-      label: <Link to="/admin">Trang quản trị</Link>,
-      key: "admin",
-    });
-  }
-  if (user?.role === "HOTEL_OWNER") {
-    userMenuItems.unshift({
-      label: <Link to="/owner">Trang quản trị</Link>,
-      key: "owner",
-    });
-  }
 
   const urlAvatar = `${import.meta.env.VITE_BACKEND_URL}/images/avatar/${
-    user?.avatar
+    user?.avatar ?? ""
   }`;
 
   return (
@@ -70,17 +73,25 @@ const AppHeader: React.FC = () => {
         <div className="header-left">
           <div className="logo-block">
             <FaReact size={34} color="#00D4AA" />
-            <span className="logo-text">Hotel Aliu</span>
+            <span
+              className="logo-text"
+              onClick={() => {
+                navigate("/");
+              }}
+            >
+              Hotel Aliu
+            </span>
           </div>
         </div>
         <nav className="header-nav">
           <Dropdown
-            overlay={
-              <Menu>
-                <Menu.Item key="vn">Tiếng Việt - VND</Menu.Item>
-                <Menu.Item key="en">English - USD</Menu.Item>
-              </Menu>
-            }
+            menu={{
+              items: [
+                { label: "Tiếng Việt - VND", key: "vn" },
+                { label: "English - USD", key: "en" },
+              ],
+            }}
+            trigger={["click"]}
           >
             <a onClick={(e) => e.preventDefault()} className="nav-link">
               🇻🇳 <span className="fw500">VND | VI</span>{" "}
@@ -89,12 +100,13 @@ const AppHeader: React.FC = () => {
           </Dropdown>
 
           <Dropdown
-            overlay={
-              <Menu>
-                <Menu.Item key="help1">Trung tâm trợ giúp</Menu.Item>
-                <Menu.Item key="help2">Liên hệ chúng tôi</Menu.Item>
-              </Menu>
-            }
+            menu={{
+              items: [
+                { label: "Trung tâm trợ giúp", key: "help1" },
+                { label: "Liên hệ chúng tôi", key: "help2" },
+              ],
+            }}
+            trigger={["click"]}
           >
             <a onClick={(e) => e.preventDefault()} className="nav-link">
               <QuestionCircleOutlined /> Hỗ trợ{" "}
@@ -105,7 +117,7 @@ const AppHeader: React.FC = () => {
           <a className="nav-link" onClick={handlePartner}>
             Hợp tác với chúng tôi
           </a>
-          <a href="#" className="nav-link">
+          <a className="nav-link" onClick={handleRetrieve}>
             <ShoppingOutlined /> Đặt chỗ của tôi
           </a>
 

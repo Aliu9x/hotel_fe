@@ -1,7 +1,9 @@
+import OwnerBookingsTable from "@/components/owner/booking/booking.list";
 
-export const BookingList = () => {
+export const BookingListPage = () => {
   return (
     <>
+      <OwnerBookingsTable />
     </>
   );
 };

@@ -1,0 +1,90 @@
+.account-content {
+  .ant-menu-inline .ant-menu-item {
+    border-radius: 8px;
+    margin: 4px 8px;
+  }
+}
+
+.booking-card {
+  border-radius: 12px;
+
+  &__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+  }
+
+  &__title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+
+    .anticon {
+      color: #1769ff;
+      font-size: 18px;
+    }
+  }
+
+  &__title-text {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  &__hotel-name {
+    font-weight: 600;
+    font-size: 16px;
+  }
+
+  &__meta {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+
+    .ant-tag {
+      border-radius: 8px;
+    }
+  }
+
+  &__grid {
+    margin-top: 8px;
+  }
+
+  &__section {
+    border-radius: 10px;
+    background: #f9fbff;
+  }
+
+  &__section-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+
+    .anticon {
+      color: #1769ff;
+    }
+
+    .ant-typography {
+      font-weight: 600;
+    }
+  }
+
+  &__section-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  // Descriptions polish
+  .ant-descriptions-item-label {
+    color: #7a8794;
+    font-weight: 500;
+  }
+  .ant-descriptions-item-content {
+    color: #223553;
+  }
+}

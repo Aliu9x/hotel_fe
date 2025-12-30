@@ -69,10 +69,6 @@ const LayoutOwner: React.FC = () => {
           label: <Link to="/owner/price">Các gói giá </Link>,
           key: "rate-plan",
         },
-        {
-          label: <Link to="/owner/price/flexible">Giá linh hoạt</Link>,
-          key: "price-flexible",
-        },
       ],
     },
     {
@@ -82,10 +78,6 @@ const LayoutOwner: React.FC = () => {
         {
           label: <Link to="/owner/property/rooms">Thiết lập phòng</Link>,
           key: "property-rooms",
-        },
-        {
-          label: <Link to="/owner/property/cancellation">Chính sách hủy</Link>,
-          key: "property-cancellation",
         },
       ],
     },

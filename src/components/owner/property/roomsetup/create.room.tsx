@@ -2,8 +2,8 @@ import {
   commitUpload,
   createAmenityMappings,
   createRoomType,
+  getAllRoomCategory,
   getAmenityCategory,
-  loadAllModerationImage,
   uploadFileAPI,
 } from "@/services/api";
 import { MAX_UPLOAD_IMAGE_SIZE } from "@/services/helper";
@@ -23,6 +23,7 @@ import {
   InputNumber,
   Modal,
   Row,
+  Select,
   Switch,
   Upload,
   type FormProps,
@@ -43,6 +44,10 @@ type IProps = {
   setOpenViewCreate: (v: boolean) => void;
   refreshTable: () => void;
 };
+type RoomTypeCategory = {
+  id: number;
+  name: string;
+};
 
 export const CreateRoomType = (props: IProps) => {
   const { openViewCreate, setOpenViewCreate, refreshTable } = props;
@@ -58,12 +63,6 @@ export const CreateRoomType = (props: IProps) => {
     setSelectedAmenity([]),
   ];
 
-  const oj = async () => {
-    const res = await loadAllModerationImage();
-    console.log(res);
-  };
-  oj();
-
   const [loadingThumbnail, setLoadingThumbnail] = useState<boolean>(false);
   const [loadingSlider, setLoadingSlider] = useState<boolean>(false);
 
@@ -74,7 +73,9 @@ export const CreateRoomType = (props: IProps) => {
   const [fileListSlider, setFileListSlider] = useState<UploadFile[]>([]);
   const [categories, setCategories] = useState<ICategory[]>([]);
   const [selectedAmenity, setSelectedAmenity] = useState<string[]>([]);
-
+  const [selectedRoomTypeCategory, setSelectedRoomTypeCategory] = useState<
+    RoomTypeCategory[]
+  >([]);
   const handleCheckboxChange = (id: string) => {
     setSelectedAmenity((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
@@ -88,7 +89,14 @@ export const CreateRoomType = (props: IProps) => {
 
     fetchData();
   }, []);
+  useEffect(() => {
+    const fetchData = async () => {
+      const res = await getAllRoomCategory();
+      if (res?.data) setSelectedRoomTypeCategory(res.data);
+    };
 
+    fetchData();
+  }, []);
   const sliderFiles = fileListSlider.map((f) => ({
     tmpFileName: f.name,
     originalName: f.name,
@@ -100,8 +108,9 @@ export const CreateRoomType = (props: IProps) => {
 
   const onFinish: FormProps<IRoomType>["onFinish"] = async (value) => {
     try {
-      setIsSubmit(true);
+      console.log(value);
       const res = await createRoomType(value);
+
       if (res.data && res) {
         await createAmenityMappings(res.data.id, selectedAmenity);
         const sliderPayload = {
@@ -133,14 +142,6 @@ export const CreateRoomType = (props: IProps) => {
     }
   };
 
-  const getBase64 = (file: FieldType): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = (error) => reject(error);
-    });
-  };
   const beforeUpload = (file: FieldType) => {
     const isJpgOrPng = file.type === "image/jpeg" || file.type === "image/png";
     if (!isJpgOrPng) {
@@ -202,7 +203,6 @@ export const CreateRoomType = (props: IProps) => {
     const { onSuccess, onError } = options;
     const file = options.file as RcFile;
 
-    // bật loading ngay khi bắt đầu
     type === "slider" ? setLoadingSlider(true) : setLoadingThumbnail(true);
 
     try {
@@ -223,7 +223,6 @@ export const CreateRoomType = (props: IProps) => {
           setFileListSlider((prev) => [...prev, uploadedFile]);
         }
 
-        // Thông báo thành công cho Upload
         onSuccess?.(res, file);
       } else {
         message.error(res?.message || "Upload thất bại");
@@ -233,7 +232,6 @@ export const CreateRoomType = (props: IProps) => {
       message.error("Lỗi mạng khi upload");
       onError?.(e);
     } finally {
-      // tắt loading trong mọi trường hợp
       type === "slider" ? setLoadingSlider(false) : setLoadingThumbnail(false);
     }
   };
@@ -271,17 +269,27 @@ export const CreateRoomType = (props: IProps) => {
           <Row gutter={16}>
             <Col span={12}>
               <Form.Item
-                label="Tên loại phòng"
-                name="name"
+                label="Loại phòng"
+                name="id_category"
                 rules={[
-                  { required: true, message: "Vui lòng nhập tên loại phòng" },
+                  { required: true, message: "Vui lòng chọn loại phòng" },
                 ]}
               >
-                <Input placeholder="VD: Phòng Deluxe Hướng Biển" />
+                <Select
+                  placeholder="Chọn loại phòng"
+                  options={selectedRoomTypeCategory.map((item) => ({
+                    label: item.name,
+                    value: String(item.id),
+                  }))}
+                />
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item label="Số lượng phòng" name="total_rooms">
+              <Form.Item
+                label="Số lượng phòng"
+                name="total_rooms"
+                rules={[{ required: true, message: "Vui lòng số lượng phòng" }]}
+              >
                 <InputNumber
                   min={1}
                   style={{ width: "100%" }}

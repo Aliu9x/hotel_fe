@@ -1,4 +1,4 @@
-import OwnerTable from "@/components/admin/user/owner";
+import OwnerTable from "@/components/admin/user/owner.table";
 
 export const OwnerPage = () => {
   return (

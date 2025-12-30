@@ -67,31 +67,6 @@ const LayoutPartner: React.FC = () => {
         </div>
       </section>
 
-      <section className="partner-logos">
-        <div className="logos-title">Đối tác nổi tiếng của chúng tôi</div>
-        <div className="logos-row">
-          <img
-            src="https://dummyimage.com/120x40/ffffff/999999&text=ARCHIPELAGO"
-            alt="Archipelago"
-          />
-          <img
-            src="https://dummyimage.com/120x40/ffffff/999999&text=IHG"
-            alt="IHG"
-          />
-          <img
-            src="https://dummyimage.com/160x40/ffffff/999999&text=Swiss-Belhotel"
-            alt="Swiss-Belhotel"
-          />
-          <img
-            src="https://dummyimage.com/120x40/ffffff/999999&text=artotel"
-            alt="artotel"
-          />
-          <img
-            src="https://dummyimage.com/140x40/ffffff/999999&text=d'primahotel"
-            alt="d'primahotel"
-          />
-        </div>
-      </section>
     </div>
   );
 };

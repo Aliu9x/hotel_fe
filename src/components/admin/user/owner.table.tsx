@@ -4,18 +4,18 @@ import { EyeTwoTone, EditTwoTone, PlusOutlined } from "@ant-design/icons";
 import type { ActionType, ProColumns } from "@ant-design/pro-table";
 import ProTable from "@ant-design/pro-table";
 import { getUserApi } from "@/services/api";
-import CreateCustomerModal from "./create.customer.modal";
-import UpdateCustomerModal from "./update.customer.modal";
+import CreateOwnerModal from "./create.owner.modal";
+import UpdateOwnerModal from "./update.owner.modal";
 import type { Role, UserStatus } from "@/types/file.constants";
 
-const roleColors: Record<string, string> = { CUSTOMER: "blue" };
-const roleText: Record<string, string> = { CUSTOMER: "Khách hàng" };
+const roleColors: Record<string, string> = { HOTEL_OWNER: "gold" };
+const roleText: Record<string, string> = { HOTEL_OWNER: "Chủ khách sạn" };
 const statusColors: Record<UserStatus, string> = {
   APPROVED: "default",
   SUSPENDED: "red",
 };
 
-const CustomerTable: React.FC = () => {
+const OwnerTable: React.FC = () => {
   const actionRef = useRef<ActionType | undefined>(undefined);
   const [openCreate, setOpenCreate] = useState(false);
 
@@ -67,8 +67,8 @@ const CustomerTable: React.FC = () => {
     },
     {
       title: "Hình thức tạo",
-      hideInSearch: true,
       width: 160,
+      hideInSearch: true,
       render: (_, e) =>
         e.signup_method === "ADMIN_CREATED" ? "Tạo bởi admin" : "Tự đăng ký",
     },
@@ -83,8 +83,8 @@ const CustomerTable: React.FC = () => {
     {
       title: "Thao tác",
       width: 100,
-      fixed: "right",
       hideInSearch: true,
+      fixed: "right",
       render: (_, entity) => (
         <Space>
           {/* <Tooltip title="Xem chi tiết">
@@ -121,7 +121,7 @@ const CustomerTable: React.FC = () => {
             const query: any = {
               page: params.current || 1,
               limit: params.pageSize || 10,
-              role: "CUSTOMER" as Role,
+              role: "HOTEL_OWNER" as Role,
             };
             const qParts = [
               params.full_name,
@@ -134,6 +134,7 @@ const CustomerTable: React.FC = () => {
               query.order = sort.created_at === "ascend" ? "ASC" : "DESC";
             }
             const res = await getUserApi(query);
+            console.log(res);
             const payload = res.data;
             return {
               data: payload?.result || [],
@@ -152,7 +153,7 @@ const CustomerTable: React.FC = () => {
         }}
         search={{ labelWidth: 140, defaultCollapsed: false, span: 6 }}
         dateFormatter="string"
-        headerTitle="Danh sách người dùng (Khách hàng)"
+        headerTitle="Danh sách người dùng (Chủ khách sạn)"
         toolBarRender={() => [
           <Button
             key="button"
@@ -165,15 +166,15 @@ const CustomerTable: React.FC = () => {
         ]}
       />
 
-      <CreateCustomerModal
+      <CreateOwnerModal
         open={openCreate}
         onClose={() => setOpenCreate(false)}
         onSuccess={() => actionRef.current?.reload()}
       />
 
-      <UpdateCustomerModal
+      <UpdateOwnerModal
         open={openUpdate}
-        user={selectedUser}
+        user={selectedUser} // truyền user từ bảng
         onClose={() => {
           setOpenUpdate(false);
           setSelectedUser(undefined);
@@ -184,4 +185,4 @@ const CustomerTable: React.FC = () => {
   );
 };
 
-export default CustomerTable;
+export default OwnerTable;

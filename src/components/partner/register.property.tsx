@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
   Card,
   Form,
@@ -17,17 +17,6 @@ import { UploadOutlined } from "@ant-design/icons";
 import "./register.property.scss";
 import { useParams, useNavigate } from "react-router-dom";
 import {
-  loadRegistration,
-  createEmptyRegistration,
-  updateSection,
-  markOverviewCompleted,
-  deleteRegistration,
-  setHotelId,
-  setStatus,
-  setFileNames,
-  type RegistrationBundle,
-} from "@/services/partner.segistration.store";
-import {
   getProvinces,
   getDistricts,
   getWards,
@@ -37,13 +26,12 @@ import {
   submitRegistration,
 } from "@/services/api";
 import PartnerAvatarDropdown from "./partner.avatar.dropdown";
+import { useCurrentApp } from "../context/app.context";
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
 
 type StepKey = "OVERVIEW" | "CONTRACT";
-type SubOverview = "BASIC_INFO" | "ADDRESS" | "CONTACT";
-type SubContract = "LEGAL_ENTITY_INFO" | "TERMS";
 
 const pickName = (label: any) =>
   typeof label === "string" ? label.split(" - ").pop()?.trim() || "" : "";
@@ -54,9 +42,9 @@ const RegisterProperty: React.FC = () => {
   const userEmail =
     localStorage.getItem("partnerUserEmail") || "partner@example.com";
 
-  const [bundle, setBundle] = useState<RegistrationBundle | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Gộp form thành 2 bước, mỗi bước có thể gồm nhiều phần nhưng chỉ 1 nút lưu/submit
   const [formBasic] = Form.useForm();
   const [formAddress] = Form.useForm();
   const [formContact] = Form.useForm();
@@ -64,9 +52,6 @@ const RegisterProperty: React.FC = () => {
   const [formTerms] = Form.useForm();
 
   const [activeMain, setActiveMain] = useState<StepKey>("OVERVIEW");
-  const [activeSub, setActiveSub] = useState<SubOverview | SubContract>(
-    "BASIC_INFO"
-  );
 
   const prevProvinceRef = useRef<number | undefined>(undefined);
   const prevDistrictRef = useRef<number | undefined>(undefined);
@@ -78,55 +63,20 @@ const RegisterProperty: React.FC = () => {
   const province_id = Form.useWatch("province_id", formAddress);
   const district_id = Form.useWatch("district_id", formAddress);
 
-  const debounceMap = useRef<Record<string, number>>({});
-
   const [contractPdfFile, setContractPdfFile] = useState<File | null>(null);
   const [identityDocFile, setIdentityDocFile] = useState<File | null>(null);
 
-  const defaultFlags: RegistrationBundle["stepFlags"] = {
-    BASIC_INFO: false,
-    ADDRESS: false,
-    CONTACT: false,
-    LEGAL_ENTITY_INFO: false,
-    SIGNATORY_INFO: false,
-    TERMS: false,
-  };
+  const [hotelId, setHotelId] = useState<number | null>(null);
 
+  const { setIsAuthenticated, setUser } = useCurrentApp();
   useEffect(() => {
     if (!code) {
       message.error("Thiếu mã đăng ký");
       navigate("/partner/dashboard");
       return;
     }
-    let reg = loadRegistration(code);
-    if (!reg) reg = createEmptyRegistration(code);
-    setBundle(reg);
-    reg.data.basicInfo && formBasic.setFieldsValue(reg.data.basicInfo);
-    reg.data.addressInfo && formAddress.setFieldsValue(reg.data.addressInfo);
-    reg.data.contactInfo && formContact.setFieldsValue(reg.data.contactInfo);
-    reg.data.legalEntity && formLegal.setFieldsValue(reg.data.legalEntity);
-    reg.data.terms && formTerms.setFieldsValue(reg.data.terms);
     setLoading(false);
-  }, [
-    code,
-    navigate,
-    formBasic,
-    formAddress,
-    formContact,
-    formLegal,
-    formTerms,
-  ]);
-
-  // Khi quay lại tab ADDRESS, đồng bộ lại form từ bundle để không mất giá trị đã lưu
-  useEffect(() => {
-    if (
-      activeSub === "ADDRESS" &&
-      bundle?.data.addressInfo &&
-      Object.keys(bundle.data.addressInfo).length
-    ) {
-      formAddress.setFieldsValue(bundle.data.addressInfo);
-    }
-  }, [activeSub, bundle, formAddress]);
+  }, [code, navigate]);
 
   useEffect(() => {
     (async () => {
@@ -168,7 +118,6 @@ const RegisterProperty: React.FC = () => {
         }));
         setDistricts(newDistricts);
 
-        // Giữ lại district_id nếu còn tồn tại; nếu không, clear kèm district_name/ward
         const currentDistrict = formAddress.getFieldValue("district_id");
         if (
           currentDistrict &&
@@ -187,7 +136,7 @@ const RegisterProperty: React.FC = () => {
         message.error("Không tải được quận/huyện");
       }
     })();
-  }, [province_id]); // eslint-disable-line
+  }, [province_id]);
 
   useEffect(() => {
     (async () => {
@@ -223,67 +172,7 @@ const RegisterProperty: React.FC = () => {
         message.error("Không tải được phường/xã");
       }
     })();
-  }, [district_id]); // eslint-disable-line
-
-  const autoSave = useCallback(
-    (section: string, values: any, flag?: string) => {
-      if (!code) return;
-      const key = section;
-      if (debounceMap.current[key])
-        window.clearTimeout(debounceMap.current[key]);
-      debounceMap.current[key] = window.setTimeout(() => {
-        updateSection(code, section as any, values, flag as any);
-        setBundle(loadRegistration(code));
-      }, 300);
-    },
-    [code]
-  );
-
-  const onBasicChange = () =>
-    autoSave("basicInfo", formBasic.getFieldsValue(true));
-  const onAddressChange = () =>
-    autoSave("addressInfo", formAddress.getFieldsValue(true));
-  const onContactChange = () =>
-    autoSave("contactInfo", formContact.getFieldsValue(true));
-  const onLegalChange = () =>
-    autoSave("legalEntity", formLegal.getFieldsValue(true));
-  const onTermsChange = () => autoSave("terms", formTerms.getFieldsValue(true));
-
-  const submitBasic = async () => {
-    await formBasic.validateFields();
-    updateSection(
-      code!,
-      "basicInfo",
-      formBasic.getFieldsValue(true),
-      "BASIC_INFO"
-    );
-    setBundle(loadRegistration(code!));
-    message.success("Đã lưu mục Thông tin cơ sở");
-    setActiveSub("ADDRESS");
-  };
-  const submitAddress = async () => {
-    await formAddress.validateFields();
-    updateSection(
-      code!,
-      "addressInfo",
-      formAddress.getFieldsValue(true),
-      "ADDRESS"
-    );
-    setBundle(loadRegistration(code!));
-    message.success("Đã lưu mục Địa chỉ");
-    setActiveSub("CONTACT");
-  };
-  const submitContact = async () => {
-    await formContact.validateFields();
-    updateSection(
-      code!,
-      "contactInfo",
-      formContact.getFieldsValue(true),
-      "CONTACT"
-    );
-    setBundle(loadRegistration(code!));
-    message.success("Đã lưu mục Thông tin liên hệ");
-  };
+  }, [district_id]);
 
   const finalizeOverview = async () => {
     if (!code) return;
@@ -296,8 +185,6 @@ const RegisterProperty: React.FC = () => {
       const a = formAddress.getFieldsValue(true);
       const c = formContact.getFieldsValue(true);
 
-      console.log("[FINALIZE] address form raw =", a);
-
       const asStr = (v: any) =>
         typeof v === "string" ? v.trim() : String(v ?? "").trim();
       const asNum = (v: any) =>
@@ -306,6 +193,7 @@ const RegisterProperty: React.FC = () => {
           : typeof v === "number"
           ? v
           : Number(v);
+
       if (a.province_id && !a.district_id) {
         message.error("Vui lòng chọn Quận/Huyện");
         return;
@@ -335,112 +223,67 @@ const RegisterProperty: React.FC = () => {
         return;
       }
 
-      console.log("[FINALIZE] createHotel payload =", payload);
-
       const hotel = await createHotel(payload);
-      console.log("[FINALIZE] createHotel response =", hotel);
-
       const hid = hotel?.id ?? hotel?.data?.id;
       if (!hid) {
         message.error("Không nhận được hotel id từ server");
         return;
       }
-      setHotelId(code, hid);
 
-      markOverviewCompleted(code);
-      updateSection(code, "basicInfo", b);
-      updateSection(code, "addressInfo", a);
-      setBundle(loadRegistration(code)!);
+      setHotelId(hid);
       message.success("Tạo khách sạn & hoàn tất Mục 1");
       setActiveMain("CONTRACT");
-      setActiveSub("LEGAL_ENTITY_INFO");
     } catch (e: any) {
-      console.error("[FINALIZE] ERROR =", e);
       const msg = Array.isArray(e?.response?.data?.message)
         ? e.response.data.message.join("; ")
         : e?.message || "Lỗi hoàn tất Mục 1";
       message.error(msg);
     }
   };
-  const submitLegal = async () => {
-    await formLegal.validateFields();
-    updateSection(
-      code!,
-      "legalEntity",
-      formLegal.getFieldsValue(true),
-      "LEGAL_ENTITY_INFO"
-    );
-    setBundle(loadRegistration(code!));
-    message.success("Đã lưu Thông tin pháp nhân");
-    setActiveSub("TERMS");
-  };
-
-  const submitTerms = async () => {
-    await formTerms.validateFields();
-    updateSection(code!, "terms", formTerms.getFieldsValue(true), "TERMS");
-    setBundle(loadRegistration(code!));
-    message.success("Đã lưu Điều khoản");
-  };
 
   const submitAll = async () => {
     if (!code) return;
     try {
-      await formBasic.validateFields();
-      await formAddress.validateFields();
-      await formContact.validateFields();
-      await formLegal.validateFields();
-      await formTerms.validateFields();
-
-      const current = loadRegistration(code);
-      const hotelId = current?.meta.hotelId;
       if (!hotelId) {
         message.error("Chưa có hotelId (cần hoàn tất mục 1)");
         return;
       }
 
+      await formLegal.validateFields();
+      await formTerms.validateFields();
+
+      const legal = formLegal.getFieldsValue(true);
+      const contact = formContact.getFieldsValue(true);
       let uploadRes: {
         contract_pdf_filename?: string;
         identity_doc_filename?: string;
       } = {};
       if (contractPdfFile || identityDocFile) {
-        uploadRes = await uploadContractFiles(hotelId, {
+        uploadRes = await uploadContractFiles({
+          id_hotel: String(hotelId),
           contract_pdf: contractPdfFile || null,
           identity_doc: identityDocFile || null,
         });
-        console.log("[WZ] FILES response =", uploadRes);
-        setFileNames(code, uploadRes);
       }
-
-      const legal = formLegal.getFieldsValue(true);
-      const contact = formContact.getFieldsValue(true);
-      const filesStore = current?.data.files || {};
-
-      const contractPdfName =
-        uploadRes.contract_pdf_filename ||
-        filesStore.contract_pdf_filename ||
-        legal.businessLicenseFileName ||
-        undefined;
-
-      const identityDocName =
-        uploadRes.identity_doc_filename ||
-        filesStore.identity_doc_filename ||
-        legal.identityDocFileName ||
-        undefined;
 
       const asStr = (v: any) =>
         typeof v === "string" ? v.trim() : String(v ?? "").trim();
-
       const payloadContract = {
+        id_hotel: String(hotelId),
         legal_name: asStr(legal.legalName),
         legal_address: asStr(legal.legalAddress),
         signer_full_name: asStr(contact.contactName),
         signer_phone: asStr(contact.contactPhone),
         signer_email: asStr(contact.contactEmail),
-        identity_doc_filename: identityDocName
-          ? asStr(identityDocName)
+        identity_doc_filename: uploadRes.identity_doc_filename
+          ? asStr(uploadRes.identity_doc_filename)
+          : legal.identityDocFileName
+          ? asStr(legal.identityDocFileName)
           : undefined,
-        contract_pdf_filename: contractPdfName
-          ? asStr(contractPdfName)
+        contract_pdf_filename: uploadRes.contract_pdf_filename
+          ? asStr(uploadRes.contract_pdf_filename)
+          : legal.businessLicenseFileName
+          ? asStr(legal.businessLicenseFileName)
           : undefined,
       };
 
@@ -459,23 +302,20 @@ const RegisterProperty: React.FC = () => {
         message.error("Thiếu dữ liệu: " + missing.join(", "));
         return;
       }
-
-      console.log("[WZ] CONTRACT UPDATE payload =", payloadContract);
-
-      await updateHotelContract(hotelId, payloadContract);
+      await updateHotelContract(payloadContract);
       const result = await submitRegistration(hotelId);
-      setStatus(code, result.status === "APPROVED" ? "APPROVED" : "PENDING");
+
       if (result.status === "APPROVED") {
         message.success("Khách sạn đã được duyệt!");
-        deleteRegistration(code);
         navigate(`/owner?hotelId=${result.hotelId}`, { replace: true });
       } else {
         message.info("Khách sạn đang được duyệt.");
-        deleteRegistration(code);
         navigate("/partner/dashboard", { replace: true });
+        setUser(null);
+        setIsAuthenticated(false);
+        localStorage.removeItem("access_token");
       }
     } catch (e: any) {
-      console.error("[WZ] SUBMIT ALL ERROR", e);
       const list =
         e?.original?.response?.data?.message || e?.response?.data?.message;
       if (Array.isArray(list)) message.error(list.join("; "));
@@ -483,14 +323,8 @@ const RegisterProperty: React.FC = () => {
         message.error(e?.message || e?.original?.message || "Lỗi gửi đăng ký");
     }
   };
-  const flags = bundle?.stepFlags ?? defaultFlags;
-  const overviewComplete =
-    flags.BASIC_INFO &&
-    flags.ADDRESS &&
-    flags.CONTACT &&
-    !!bundle?.meta.completedOverview;
-  const canOpenContract = !!bundle?.meta.completedOverview;
 
+  const canOpenContract = !!hotelId;
   return (
     <div className="reg-wizard">
       <div className="rw-header-top">
@@ -501,7 +335,7 @@ const RegisterProperty: React.FC = () => {
         <div className="rw-header-mid">
           <div className="rw-info-block">
             <Text type="secondary">Tên cơ sở</Text>{" "}
-            <b>{bundle?.data.basicInfo?.name || "(Chưa đặt tên)"}</b>
+            <b>{formBasic.getFieldValue("name") || "(Chưa đặt tên)"}</b>
           </div>
           <div className="rw-info-block">
             <Text type="secondary">Mã đăng ký</Text> <b>{code}</b>
@@ -520,52 +354,16 @@ const RegisterProperty: React.FC = () => {
         </Title>
 
         <div className="rw-grid">
-          {/* Sidebar */}
           <div className="rw-sidebar">
             <div
               className={`rw-main ${activeMain === "OVERVIEW" ? "active" : ""}`}
               onClick={() => setActiveMain("OVERVIEW")}
             >
               <div className="rw-main-head">
-                <span>Tổng quan cơ sở lưu trú</span>
-                {overviewComplete && <span className="rw-check">✔</span>}
+                <span>Mục 1: Tổng quan cơ sở lưu trú</span>
               </div>
-              <ul className="rw-sub-list">
-                <li
-                  className={activeSub === "BASIC_INFO" ? "active" : ""}
-                  onClick={() => setActiveSub("BASIC_INFO")}
-                >
-                  Thông tin cơ sở{" "}
-                  {flags.BASIC_INFO && <span className="rw-check-sm">✔</span>}
-                </li>
-                <li
-                  className={activeSub === "ADDRESS" ? "active" : ""}
-                  onClick={() => setActiveSub("ADDRESS")}
-                >
-                  Địa chỉ{" "}
-                  {flags.ADDRESS && <span className="rw-check-sm">✔</span>}
-                </li>
-                <li
-                  className={activeSub === "CONTACT" ? "active" : ""}
-                  onClick={() => setActiveSub("CONTACT")}
-                >
-                  Thông tin liên hệ{" "}
-                  {flags.CONTACT && <span className="rw-check-sm">✔</span>}
-                </li>
-              </ul>
               <div style={{ marginTop: 10 }}>
-                <Button
-                  type="primary"
-                  disabled={
-                    !(
-                      flags.BASIC_INFO &&
-                      flags.ADDRESS &&
-                      flags.CONTACT &&
-                      !bundle?.meta.completedOverview
-                    )
-                  }
-                  onClick={finalizeOverview}
-                >
+                <Button type="primary" onClick={finalizeOverview}>
                   Hoàn tất mục 1
                 </Button>
               </div>
@@ -578,32 +376,12 @@ const RegisterProperty: React.FC = () => {
               onClick={() => canOpenContract && setActiveMain("CONTRACT")}
             >
               <div className="rw-main-head">
-                <span>Hợp đồng</span>
+                <span>Mục 2: Hợp đồng</span>
               </div>
-              <ul className="rw-sub-list">
-                <li
-                  className={activeSub === "LEGAL_ENTITY_INFO" ? "active" : ""}
-                  onClick={() =>
-                    canOpenContract && setActiveSub("LEGAL_ENTITY_INFO")
-                  }
-                >
-                  Thông tin pháp nhân{" "}
-                  {flags.LEGAL_ENTITY_INFO && (
-                    <span className="rw-check-sm">✔</span>
-                  )}
-                </li>
-                <li
-                  className={activeSub === "TERMS" ? "active" : ""}
-                  onClick={() => canOpenContract && setActiveSub("TERMS")}
-                >
-                  Điều khoản hợp đồng{" "}
-                  {flags.TERMS && <span className="rw-check-sm">✔</span>}
-                </li>
-              </ul>
               <div style={{ marginTop: 12 }}>
                 <Button
                   type="primary"
-                  disabled={!flags.TERMS || !flags.LEGAL_ENTITY_INFO}
+                  disabled={!canOpenContract}
                   onClick={submitAll}
                 >
                   Gửi đăng ký
@@ -612,20 +390,16 @@ const RegisterProperty: React.FC = () => {
             </div>
           </div>
 
-          {/* Content */}
           <div className="rw-content">
             {loading && <Card loading style={{ minHeight: 200 }} />}
 
-            {/* BASIC */}
-            {!loading &&
-              activeMain === "OVERVIEW" &&
-              activeSub === "BASIC_INFO" && (
+            {!loading && activeMain === "OVERVIEW" && (
+              <>
                 <Card className="rw-card">
                   <Title level={4}>Thông tin cơ sở lưu trú</Title>
                   <Form
                     form={formBasic}
                     layout="vertical"
-                    onValuesChange={onBasicChange}
                     initialValues={{ star_rating: 0 }}
                   >
                     <Row gutter={16}>
@@ -651,25 +425,12 @@ const RegisterProperty: React.FC = () => {
                     <Form.Item name="description" label="Mô tả">
                       <TextArea rows={3} placeholder="Mô tả ngắn..." />
                     </Form.Item>
-                    <Button type="primary" onClick={submitBasic}>
-                      Lưu mục này
-                    </Button>
                   </Form>
                 </Card>
-              )}
 
-            {/* ADDRESS */}
-            {!loading &&
-              activeMain === "OVERVIEW" &&
-              activeSub === "ADDRESS" && (
                 <Card className="rw-card">
                   <Title level={4}>Địa chỉ cơ sở lưu trú</Title>
-                  <Form
-                    form={formAddress}
-                    layout="vertical"
-                    onValuesChange={onAddressChange}
-                  >
-                    {/* Hidden fields for names to store alongside IDs */}
+                  <Form form={formAddress} layout="vertical">
                     <Form.Item name="province_name" hidden>
                       <Input />
                     </Form.Item>
@@ -709,7 +470,6 @@ const RegisterProperty: React.FC = () => {
                             }}
                             onChange={(value, option: any) => {
                               if (!value) {
-                                // clear all dependent names + ids
                                 formAddress.setFieldsValue({
                                   province_name: undefined,
                                   district_id: undefined,
@@ -729,7 +489,7 @@ const RegisterProperty: React.FC = () => {
                           rules={[
                             {
                               validator: (_, v) => {
-                                if (!province_id) return Promise.resolve(); // chưa chọn tỉnh -> cho qua
+                                if (!province_id) return Promise.resolve();
                                 if (province_id && !v)
                                   return Promise.reject(
                                     new Error("Chọn quận/huyện")
@@ -774,7 +534,7 @@ const RegisterProperty: React.FC = () => {
                           rules={[
                             {
                               validator: (_, v) => {
-                                if (!district_id) return Promise.resolve(); // chưa chọn quận -> cho qua
+                                if (!district_id) return Promise.resolve();
                                 if (district_id && !v)
                                   return Promise.reject(
                                     new Error("Chọn phường/xã")
@@ -811,24 +571,12 @@ const RegisterProperty: React.FC = () => {
                         </Form.Item>
                       </Col>
                     </Row>
-                    <Button type="primary" onClick={submitAddress}>
-                      Lưu mục này
-                    </Button>
                   </Form>
                 </Card>
-              )}
 
-            {/* CONTACT */}
-            {!loading &&
-              activeMain === "OVERVIEW" &&
-              activeSub === "CONTACT" && (
                 <Card className="rw-card">
                   <Title level={4}>Thông tin liên hệ</Title>
-                  <Form
-                    form={formContact}
-                    layout="vertical"
-                    onValuesChange={onContactChange}
-                  >
+                  <Form form={formContact} layout="vertical">
                     <Form.Item
                       name="contactName"
                       label="Tên người liên hệ"
@@ -853,24 +601,22 @@ const RegisterProperty: React.FC = () => {
                     >
                       <Input />
                     </Form.Item>
-                    <Button type="primary" onClick={submitContact}>
-                      Lưu mục này
-                    </Button>
                   </Form>
                 </Card>
-              )}
 
-            {/* LEGAL + FILES */}
-            {!loading &&
-              activeMain === "CONTRACT" &&
-              activeSub === "LEGAL_ENTITY_INFO" && (
+                <div style={{ textAlign: "right" }}>
+                  <Button type="primary" onClick={finalizeOverview}>
+                    Hoàn tất mục 1
+                  </Button>
+                </div>
+              </>
+            )}
+
+            {!loading && activeMain === "CONTRACT" && (
+              <>
                 <Card className="rw-card">
                   <Title level={4}>Thông tin pháp nhân + Tài liệu</Title>
-                  <Form
-                    form={formLegal}
-                    layout="vertical"
-                    onValuesChange={onLegalChange}
-                  >
+                  <Form form={formLegal} layout="vertical">
                     <Form.Item
                       name="legalName"
                       label="Tên pháp nhân hoặc tên cá nhân"
@@ -972,45 +718,45 @@ const RegisterProperty: React.FC = () => {
                         </Form.Item>
                       </Col>
                     </Row>
-
-                    <Button type="primary" onClick={submitLegal}>
-                      Lưu mục này
-                    </Button>
                   </Form>
                 </Card>
-              )}
 
-            {/* TERMS */}
-            {!loading && activeMain === "CONTRACT" && activeSub === "TERMS" && (
-              <Card className="rw-card">
-                <Title level={4}>Điều khoản hợp đồng</Title>
-                <Form
-                  form={formTerms}
-                  layout="vertical"
-                  onValuesChange={onTermsChange}
-                  initialValues={{ acceptTerms: false }}
-                >
-                  <Form.Item
-                    name="acceptTerms"
-                    valuePropName="checked"
-                    rules={[
-                      {
-                        validator: (_, v) =>
-                          v
-                            ? Promise.resolve()
-                            : Promise.reject(
-                                new Error("Cần chấp nhận điều khoản")
-                              ),
-                      },
-                    ]}
+                <Card className="rw-card">
+                  <Title level={4}>Điều khoản hợp đồng</Title>
+                  <Form
+                    form={formTerms}
+                    layout="vertical"
+                    initialValues={{ acceptTerms: false }}
                   >
-                    <Checkbox>Tôi đã đọc và chấp nhận điều khoản</Checkbox>
-                  </Form.Item>
-                  <Button type="primary" onClick={submitTerms}>
-                    Lưu mục này
+                    <Form.Item
+                      name="acceptTerms"
+                      valuePropName="checked"
+                      rules={[
+                        {
+                          validator: (_, v) =>
+                            v
+                              ? Promise.resolve()
+                              : Promise.reject(
+                                  new Error("Cần chấp nhận điều khoản")
+                                ),
+                        },
+                      ]}
+                    >
+                      <Checkbox>Tôi đã đọc và chấp nhận điều khoản</Checkbox>
+                    </Form.Item>
+                  </Form>
+                </Card>
+
+                <div style={{ textAlign: "right" }}>
+                  <Button
+                    type="primary"
+                    disabled={!canOpenContract}
+                    onClick={submitAll}
+                  >
+                    Gửi đăng ký
                   </Button>
-                </Form>
-              </Card>
+                </div>
+              </>
             )}
           </div>
         </div>

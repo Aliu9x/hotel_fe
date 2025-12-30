@@ -104,7 +104,6 @@ const MediaAmenities: React.FC = () => {
     (async () => {
       try {
         const res = await loadImageHotel();
-
         const thumb =
           typeof res.data?.thumbnail === "string"
             ? res.data.thumbnail.trim()

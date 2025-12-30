@@ -23,13 +23,10 @@ const TableRatePlan = () => {
   useEffect(() => {
     const fetchRoomTypes = async () => {
       const qs = new URLSearchParams();
-      qs.append('page', '1');
-      qs.append('limit', '200');
       try {
         const res = await getRoomType(qs.toString());
         setRoomTypes(res.data?.result || []);
       } catch {
-        // ignore error
       }
     };
     fetchRoomTypes();
@@ -88,34 +85,8 @@ const TableRatePlan = () => {
       hideInSearch: true,
       render: (_, r) => Number(r.price_amount).toLocaleString('vi-VN'),
     },
-    {
-      title: 'Loại hoàn/hủy',
-      dataIndex: 'type',
-      hideInSearch: true,
-      render: (_, r) => {
-        const map: Record<RatePlanType, { color: string; text: string }> = {
-          REFUNDABLE: { color: 'green', text: 'Hoàn/Hủy linh hoạt' },
-          NON_REFUNDABLE: { color: 'red', text: 'Không hoàn hủy' },
-          SEMI_FLEX: { color: 'orange', text: 'Bán linh hoạt' },
-        };
-        const c = map[r.type];
-        return <Tag color={c.color}>{c.text}</Tag>;
-      },
-    },
-    {
-      title: 'Gói bữa ăn',
-      dataIndex: 'meal_plan',
-      hideInSearch: true,
-      render: (_, r) => {
-        const mealMap: Record<string, string> = {
-          NONE: 'Không',
-          BREAKFAST: 'Bữa sáng',
-          HALF_BOARD: 'Bữa sáng + Bữa tối',
-          FULL_BOARD: '3 bữa (Full board)',
-        };
-        return mealMap[r.meal_plan || 'NONE'] || '-';
-      },
-    },
+ 
+ 
     {
       title: 'Số khách (Cơ bản/Tối đa)',
       dataIndex: 'base_occupancy',

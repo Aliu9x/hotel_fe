@@ -1,4 +1,4 @@
-import CustomerTable from "@/components/admin/user/customer";
+import CustomerTable from "@/components/admin/user/users.table";
 
 export const CustomersPage = () => {
   return (

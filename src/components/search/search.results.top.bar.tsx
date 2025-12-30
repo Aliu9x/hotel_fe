@@ -59,24 +59,19 @@ const SearchResultsTopBar: React.FC<Props> = ({
   const [guestVisible, setGuestVisible] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // Ref đến DestinationSearch để kiểm tra hợp lệ trước khi tìm kiếm
   const destRef = useRef<DestinationSearchRef>(null);
 
   const runSearch = async () => {
-    // 1) BẮT BUỘC phải chọn từ gợi ý mới cho tìm kiếm
     const validation = destRef.current?.validateBeforeSearch?.();
     if (!validation || validation.ok === false) {
-      // DestinationSearch sẽ tự hiển thị "hãy nhập thêm thông tin để tìm kiếm chính xác hơn"
       return;
     }
 
-    // Đồng bộ state (không bắt buộc, nhưng giúp giữ nhất quán hiển thị)
     const selectedLabel = validation.destination;
     const selectedCtx = validation.context;
     if (selectedLabel !== destination) setDestination(selectedLabel);
     setDestCtx(selectedCtx);
 
-    // 2) Kiểm tra ngày (giữ nguyên giao diện và logic cũ)
     if (!dates[0] || !dates[1]) {
       message.error("Chọn ngày");
       return;
@@ -119,7 +114,6 @@ const SearchResultsTopBar: React.FC<Props> = ({
             ref={destRef}
             initialValue={destination}
             onSelectionChange={(d, ctx) => {
-              // Gõ tay => ctx rỗng, Chỉ khi chọn từ gợi ý mới có ctx đầy đủ
               setDestination(d);
               setDestCtx(ctx);
             }}

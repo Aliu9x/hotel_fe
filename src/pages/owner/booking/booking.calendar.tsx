@@ -1,299 +1,203 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Card,
-  Row,
-  Col,
-  Space,
-  Typography,
+  Calendar,
   Select,
-  DatePicker,
-  InputNumber,
-  Button,
-  Divider,
+  Badge,
   Spin,
-  message,
+  Empty,
+  Tag,
+  Space,
+  Divider,
 } from "antd";
-import dayjs from "dayjs";
-import type { Dayjs } from "dayjs";
-import {
-  adjustInventory,
-  cancelReservation,
-  getInventoriesRange,
-  reserveInventory,
-} from "@/services/api";
-import { InventoryCalendar } from "@/components/owner/booking/inventory/inventory.calendar";
-import { InventoryAdjustModal } from "@/components/owner/booking/inventory/inventory.adjust.modal";
+import dayjs, { Dayjs } from "dayjs";
+import type { CalendarProps } from "antd";
+import { getInventories, getRoomType } from "@/services/api";
 
-const { Title, Text } = Typography;
-const { RangePicker } = DatePicker;
+interface IRoomType {
+  id: string;
+  name: string;
+}
+// yyyy-MM-dd
+interface IInventory {
+  id: string;
+  inventoryDate: string;
+  totalRooms: number;
+  availableRooms: number;
+  blockedRooms: number;
+  roomsSold: number;
+  stopSell: boolean;
+}
 
-const toISO = (d: Dayjs) => d.format("YYYY-MM-DD");
-
-export const InventoryPage: React.FC = () => {
-  // State chọn bộ lọc
-  const [hotelId, setHotelId] = useState<number | undefined>(1);
-  const [roomTypeId, setRoomTypeId] = useState<number | undefined>(1);
-  const [range, setRange] = useState<[Dayjs, Dayjs]>([
-    dayjs().startOf("month"),
-    dayjs().endOf("month"),
-  ]);
-
-  // State dữ liệu
+const InventoryPage = () => {
+  const [roomTypes, setRoomTypes] = useState<IRoomType[]>([]);
+  const [selectedRoomType, setSelectedRoomType] = useState<string>();
   const [inventories, setInventories] = useState<IInventory[]>([]);
-  const [loading, setLoading] = useState<boolean>(false);
-
-  // Action reserve/cancel
-  const [quantity, setQuantity] = useState<number>(1);
-
-  // Modal adjust
-  const [modalOpen, setModalOpen] = useState(false);
-  const [modalLoading, setModalLoading] = useState(false);
-  const [selectedInv, setSelectedInv] = useState<IInventory | null>(null);
-  const [selectedDateISO, setSelectedDateISO] = useState<string | null>(null);
-
-  const canQuery = useMemo(
-    () => !!hotelId && !!roomTypeId && range?.[0] && range?.[1],
-    [hotelId, roomTypeId, range]
-  );
-
-  const fetchData = useCallback(async () => {
-    if (!canQuery) return;
-    try {
-      setLoading(true);
-      const { data } = await getInventoriesRange({
-        hotelId: hotelId!,
-        roomTypeId: roomTypeId!,
-        fromDate: toISO(range[0].startOf("month")),
-        toDate: toISO(range[1].endOf("month").add(1, "day")), // toDate exclusive
-      });
-      if (data) {
-        setInventories(data);
-      } else {
-      }
-    } catch (e: any) {
-      message.error(e?.response?.data?.message || e.message || "Lỗi hệ thống");
-    } finally {
-      setLoading(false);
-    }
-  }, [canQuery, hotelId, roomTypeId, range]);
+  const [loading, setLoading] = useState(false);
+  const [visibleMonth, setVisibleMonth] = useState<Dayjs>(dayjs());
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    const fetchRoomTypes = async () => {
+      try {
+        const res = await getRoomType("");
+        const list: IRoomType[] = res.data?.result || [];
+        setRoomTypes(list);
 
-  const onCellClick = (inv: IInventory | null, dateISO: string) => {
-    setSelectedInv(inv);
-    setSelectedDateISO(dateISO);
-    setModalOpen(true);
-  };
-
-  const doReserve = async () => {
-    if (!hotelId || !roomTypeId || !range?.[0] || !range?.[1]) return;
-    const payload: IReserveInventoryPayload = {
-      hotelId,
-      roomTypeId,
-      fromDate: toISO(range[0]),
-      toDate: toISO(range[1].add(1, "day")),
-      quantity,
+        const lastSelected = localStorage.getItem("selectedRoomType");
+        const initialId =
+          list.find((rt) => rt.id === lastSelected)?.id ?? list[0]?.id;
+        if (!selectedRoomType && initialId) {
+          setSelectedRoomType(initialId);
+        }
+      } catch {
+        setRoomTypes([]);
+      }
     };
-    try {
-      setLoading(true);
-      const { data } = await reserveInventory(payload);
-      if (data) {
-        message.success(`Giữ phòng thành công: ${data.quantity} phòng`);
-        fetchData();
-      } else {
-        message.error(data || "Giữ phòng thất bại");
-      }
-    } catch (e: any) {
-      message.error(
-        e?.response?.data?.message || e.message || "Giữ phòng thất bại"
-      );
-    } finally {
-      setLoading(false);
+    fetchRoomTypes();
+  }, []);
+  useEffect(() => {
+    if (selectedRoomType) {
+      localStorage.setItem("selectedRoomType", selectedRoomType);
     }
-  };
+  }, [selectedRoomType]);
+  useEffect(() => {
+    if (!selectedRoomType) return;
+    const fetchInventories = async () => {
+      setLoading(true);
+      try {
+        const startDate = visibleMonth.startOf("month").format("YYYY-MM-DD");
+        const endDate = visibleMonth.endOf("month").format("YYYY-MM-DD");
 
-  const doCancel = async () => {
-    if (!hotelId || !roomTypeId || !range?.[0] || !range?.[1]) return;
-    const payload: ICancelReservationPayload = {
-      hotelId,
-      roomTypeId,
-      fromDate: toISO(range[0]),
-      toDate: toISO(range[1].add(1, "day")),
-      quantity,
+        const res = await getInventories({
+          roomTypeId: selectedRoomType,
+          startDate,
+          endDate,
+        });
+        setInventories(res.data || []);
+      } catch {
+        setInventories([]);
+      } finally {
+        setLoading(false);
+      }
     };
-    try {
-      setLoading(true);
-      const { data } = await cancelReservation(payload);
-      if (data) {
-        message.success(`Hủy thành công: trả lại ${data.quantity} phòng`);
-        fetchData();
-      } else {
-        message.error(data || "Hủy thất bại");
-      }
-    } catch (e: any) {
-      message.error(e?.response?.data?.message || e.message || "Hủy thất bại");
-    } finally {
-      setLoading(false);
+
+    fetchInventories();
+  }, [selectedRoomType, visibleMonth]);
+
+  const inventoryMap = useMemo(() => {
+    const map = new Map<string, IInventory>();
+    inventories.forEach((inv) => {
+      map.set(inv.inventoryDate, inv);
+    });
+    return map;
+  }, [inventories]);
+
+  const dateCellRender = (value: Dayjs) => {
+    const dateStr = value.format("YYYY-MM-DD");
+    const inv = inventoryMap.get(dateStr);
+
+    if (!inv) {
+      return <div style={{ color: "#999", textAlign: "center" }}>No data</div>;
     }
+
+    const effective = Math.max(
+      0,
+      (inv.availableRooms ?? 0) - (inv.blockedRooms ?? 0) - (inv.roomsSold ?? 0)
+    );
+
+    if (inv.stopSell) {
+      return (
+        <div style={{ textAlign: "center" }}>
+          <Tag color="red">Stop sell</Tag>
+          <div style={{ fontSize: 12, color: "#999" }}>
+            Tổng: {inv.totalRooms}
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div style={{ textAlign: "center" }}>
+        {effective > 0 ? (
+          <Tag color="green">Trống {effective}</Tag>
+        ) : (
+          <Tag color="red">Hết phòng</Tag>
+        )}
+
+        <div style={{ marginTop: 4 }}>
+          <Space size={4} wrap>
+            <Tag color="cyan">Còn bán {inv.availableRooms}</Tag>
+            {inv.roomsSold > 0 && (
+              <Tag color="blue">Đã bán {inv.roomsSold}</Tag>
+            )}
+            {inv.blockedRooms > 0 && (
+              <Tag color="orange">Đã chặn {inv.blockedRooms}</Tag>
+            )}
+          </Space>
+        </div>
+
+        <div style={{ fontSize: 12, color: "#999", marginTop: 4 }}>
+          Tổng: {inv.totalRooms}
+        </div>
+      </div>
+    );
   };
 
-  const submitAdjust = async (payload: IAdjustInventoryPayload) => {
-    if (!selectedInv) {
-      message.warning(
-        "Ngày chưa có bản ghi, vui lòng tạo ở BE hoặc bổ sung luồng create ở FE."
-      );
-      return;
-    }
-    try {
-      setModalLoading(true);
-      const { data } = await adjustInventory(selectedInv.id, payload);
-      if (data) {
-        message.success("Cập nhật thành công");
-        setModalOpen(false);
-        fetchData();
-      } else {
-        message.error(data || "Cập nhật thất bại");
-      }
-    } catch (e: any) {
-      message.error(
-        e?.response?.data?.message || e.message || "Cập nhật thất bại"
-      );
-    } finally {
-      setModalLoading(false);
-    }
+  const disabledDate: CalendarProps<Dayjs>["disabledDate"] = (value) => {
+    const dateStr = value.format("YYYY-MM-DD");
+    const inv = inventoryMap.get(dateStr);
+    if (!inv) return true;
+    if (inv.stopSell) return true;
+    const effective =
+      (inv.availableRooms ?? 0) -
+      (inv.blockedRooms ?? 0) -
+      (inv.roomsSold ?? 0);
+    if (effective <= 0) return true;
+    return false;
   };
 
-  // Mock dữ liệu Hotel/RoomType (thay bằng API thực tế nếu có)
-  const hotelOptions = [
-    { value: 1, label: "Hotel #1" },
-    { value: 2, label: "Hotel #2" },
-  ];
-  const roomTypeOptions = [
-    { value: 1, label: "Deluxe" },
-    { value: 2, label: "Suite" },
-  ];
+  const onPanelChange: CalendarProps<Dayjs>["onPanelChange"] = (value) => {
+    setVisibleMonth(value.startOf("month"));
+  };
 
   return (
-    <Spin spinning={loading}>
-      <Space direction="vertical" style={{ width: "100%" }} size="large">
-        <Card>
-          <Row gutter={[16, 16]} align="middle">
-            <Col xs={24} md={6}>
-              <Space direction="vertical" style={{ width: "100%" }}>
-                <Text strong>Khách sạn</Text>
-                <Select
-                  options={hotelOptions}
-                  value={hotelId}
-                  onChange={(v) => setHotelId(v)}
-                  showSearch
-                  placeholder="Chọn khách sạn"
-                />
-              </Space>
-            </Col>
-            <Col xs={24} md={6}>
-              <Space direction="vertical" style={{ width: "100%" }}>
-                <Text strong>Loại phòng</Text>
-                <Select
-                  options={roomTypeOptions}
-                  value={roomTypeId}
-                  onChange={(v) => setRoomTypeId(v)}
-                  showSearch
-                  placeholder="Chọn loại phòng"
-                />
-              </Space>
-            </Col>
-            <Col xs={24} md={8}>
-              <Space direction="vertical" style={{ width: "100%" }}>
-                <Text strong>Khoảng ngày</Text>
-                <RangePicker
-                  value={range}
-                  onChange={(val) => {
-                    if (val && val[0] && val[1])
-                      setRange(val as [Dayjs, Dayjs]);
-                  }}
-                  allowEmpty={false}
-                />
-              </Space>
-            </Col>
-            <Col xs={24} md={4}>
-              <Space direction="vertical" style={{ width: "100%" }}>
-                <Text strong>Số lượng</Text>
-                <InputNumber
-                  min={1}
-                  value={quantity}
-                  onChange={(v) => setQuantity(Number(v) || 1)}
-                  style={{ width: "100%" }}
-                />
-              </Space>
-            </Col>
-            <Col xs={24}>
-              <Space wrap>
-                <Button type="primary" onClick={fetchData}>
-                  Làm mới
-                </Button>
-                <Button onClick={doReserve}>Giữ phòng</Button>
-                <Button danger onClick={doCancel}>
-                  Hủy (trả phòng)
-                </Button>
-              </Space>
-            </Col>
-          </Row>
-        </Card>
-
-        <Card>
-          <Title level={4} style={{ marginBottom: 0 }}>
-            Lịch tồn kho
-          </Title>
-          <Text type="secondary">Click vào một ngày để điều chỉnh nhanh</Text>
-          <Divider />
-          <InventoryCalendar
-            inventories={inventories}
-            onCellClick={onCellClick}
-          />
-        </Card>
+    <Card title="Lịch tồn kho theo loại phòng">
+      <Select
+        style={{ width: 300, marginBottom: 16 }}
+        placeholder="Chọn loại phòng"
+        value={selectedRoomType}
+        onChange={setSelectedRoomType}
+        allowClear
+      >
+        {roomTypes.map((rt) => (
+          <Select.Option key={rt.id} value={rt.id}>
+            {rt.name}
+          </Select.Option>
+        ))}
+      </Select>
+      <Space size={8} wrap>
+        <Tag color="green" style={{ marginLeft: "10px" }}>
+          Trống
+        </Tag>
+        <Tag color="cyan">Còn bán</Tag>
+        <Tag color="blue">Đã bán</Tag>
+        <Tag color="orange">Đã chặn</Tag>
+        <Tag color="red">Hết phòng / Stop sell</Tag>
       </Space>
-      // ...
-      <InventoryAdjustModal
-        open={modalOpen}
-        loading={modalLoading}
-        inventory={selectedInv}
-        onCancel={() => setModalOpen(false)}
-        onSubmit={async (payload) => {
-          console.log("[Page] onSubmit called with:", {
-            id: "1",
-            payload,
-          });
-          if (!selectedInv?.id) {
-            // Nếu đang click ngày không có bản ghi, sẽ không có id để adjust
-            message.warning(
-              "Ngày chưa có bản ghi. Vui lòng chọn ô có dữ liệu hoặc tạo bản ghi trước."
-            );
-            return;
-          }
-          try {
-            setModalLoading(true);
-            const res = await adjustInventory("1", payload);
-            console.log("[Page] adjustInventory response:", res);
-            if (res.data) {
-              message.success("Cập nhật thành công");
-              setModalOpen(false);
-              fetchData();
-            } else {
-              message.error(res.data || "Cập nhật thất bại");
-            }
-          } catch (e: any) {
-            console.error("adjustInventory error", e);
-            message.error(
-              e?.response?.data?.message || e.message || "Cập nhật thất bại"
-            );
-          } finally {
-            setModalLoading(false);
-          }
-        }}
-      />
-    </Spin>
+      <Divider style={{ margin: "8px 0" }} />
+      {!selectedRoomType ? (
+        <Empty description="Vui lòng chọn loại phòng" />
+      ) : loading ? (
+        <Spin />
+      ) : (
+        <Calendar
+          dateCellRender={dateCellRender}
+          disabledDate={disabledDate}
+          onPanelChange={onPanelChange}
+          value={visibleMonth}
+        />
+      )}
+    </Card>
   );
 };
 

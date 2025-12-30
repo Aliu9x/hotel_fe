@@ -1,4 +1,4 @@
-import { createRatePlan } from "@/services/api";
+import { createRatePlan, getAllRatePlanCategory } from "@/services/api";
 import {
   Modal,
   Form,
@@ -10,7 +10,7 @@ import {
   Switch,
   message,
 } from "antd";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const { Option } = Select;
 const { TextArea } = Input;
@@ -21,11 +21,30 @@ interface IProps {
   onSuccess: () => void;
   roomTypes: IRoomType[];
 }
-
+type RatePlanCategory = {
+  id: number;
+  name: string;
+};
 const CreateRatePlan = ({ open, onClose, onSuccess, roomTypes }: IProps) => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
+  const [selectedRatePlanCategory, setSelectedRatePlanCategory] = useState<
+    RatePlanCategory[]
+  >([]);
 
+  const [roomMaxOccupancy, setRoomMaxOccupancy] = useState<number | undefined>(
+    undefined
+  );
+
+  console.log(roomMaxOccupancy);
+  useEffect(() => {
+    const fetchData = async () => {
+      const res = await getAllRatePlanCategory();
+      if (res?.data) setSelectedRatePlanCategory(res.data);
+    };
+
+    fetchData();
+  }, []);
   const handleOk = () => form.submit();
 
   const onFinish = async (v: any) => {
@@ -35,11 +54,9 @@ const CreateRatePlan = ({ open, onClose, onSuccess, roomTypes }: IProps) => {
         hotel_id?: string;
       } = {
         room_type_id: v.room_type_id,
-        name: v.name.trim(),
+        rate_plan_category_id: v.rate_plan_category_id,
         price_amount: String(v.price_amount),
         description: v.description?.trim(),
-        meal_plan: v.meal_plan,
-        type: v.type,
         base_occupancy: v.base_occupancy,
         max_occupancy: v.max_occupancy,
         extra_adult_fee: String(v.extra_adult_fee ?? 0),
@@ -80,9 +97,8 @@ const CreateRatePlan = ({ open, onClose, onSuccess, roomTypes }: IProps) => {
         layout="vertical"
         onFinish={onFinish}
         initialValues={{
-          type: "REFUNDABLE",
-          base_occupancy: 2,
-          max_occupancy: 2,
+          base_occupancy: 1,
+          max_occupancy: 1,
           extra_adult_fee: 0,
           extra_child_fee: 0,
           prepayment_required: false,
@@ -95,7 +111,23 @@ const CreateRatePlan = ({ open, onClose, onSuccess, roomTypes }: IProps) => {
               name="room_type_id"
               rules={[{ required: true, message: "Vui lòng chọn loại phòng" }]}
             >
-              <Select placeholder="Chọn loại phòng">
+              <Select
+                placeholder="Chọn loại phòng"
+                onChange={(value) => {
+                  const room = roomTypes.find((rt) => rt.id === value);
+                  if (room) {
+                    setRoomMaxOccupancy(room.max_occupancy);
+                    const base = form.getFieldValue("base_occupancy");
+                    const max = form.getFieldValue("max_occupancy");
+                    if (base > room.max_occupancy) {
+                      form.setFieldValue("base_occupancy", room.max_occupancy);
+                    }
+                    if (max > room.max_occupancy) {
+                      form.setFieldValue("max_occupancy", room.max_occupancy);
+                    }
+                  }
+                }}
+              >
                 {roomTypes.map((rt) => (
                   <Option key={rt.id} value={rt.id}>
                     {rt.name}
@@ -106,11 +138,17 @@ const CreateRatePlan = ({ open, onClose, onSuccess, roomTypes }: IProps) => {
           </Col>
           <Col span={12}>
             <Form.Item
-              label="Tên gói giá"
-              name="name"
-              rules={[{ required: true, message: "Nhập tên gói giá" }]}
+              label="Gói giá"
+              name="rate_plan_category_id"
+              rules={[{ required: true, message: "Vui lòng chọn gói giá" }]}
             >
-              <Input placeholder="Ví dụ: Linh hoạt / Không hoàn hủy..." />
+              <Select
+                placeholder="Chọn gói giá"
+                options={selectedRatePlanCategory.map((item) => ({
+                  label: item.name,
+                  value: String(item.id),
+                }))}
+              />
             </Form.Item>
           </Col>
         </Row>
@@ -131,48 +169,69 @@ const CreateRatePlan = ({ open, onClose, onSuccess, roomTypes }: IProps) => {
               />
             </Form.Item>
           </Col>
-          <Col span={12}>
-            <Form.Item label="Gói bữa ăn" name="meal_plan">
-              <Select allowClear placeholder="Chọn hoặc để trống">
-                <Option value="NONE">Không</Option>
-                <Option value="BREAKFAST">Bữa sáng</Option>
-                <Option value="HALF_BOARD">Bữa sáng + Bữa tối</Option>
-                <Option value="FULL_BOARD">3 bữa</Option>
-              </Select>
-            </Form.Item>
-          </Col>
-        </Row>
-
-        <Row gutter={16}>
-          <Col span={12}>
-            <Form.Item
-              label="Loại hoàn/hủy"
-              name="type"
-              rules={[{ required: true }]}
-            >
-              <Select>
-                <Option value="REFUNDABLE">Hoàn/Hủy linh hoạt</Option>
-                <Option value="NON_REFUNDABLE">Không hoàn hủy</Option>
-                <Option value="SEMI_FLEX">Bán linh hoạt</Option>
-              </Select>
-            </Form.Item>
-          </Col>
           <Col span={6}>
             <Form.Item
               label="Số khách cơ bản"
               name="base_occupancy"
-              rules={[{ required: true, message: "Nhập số khách cơ bản" }]}
+              rules={[
+                { required: true, message: "Nhập số khách cơ bản" },
+                ({ getFieldValue }) => ({
+                  validator(_, value) {
+                    if (
+                      roomMaxOccupancy !== undefined &&
+                      value > roomMaxOccupancy
+                    ) {
+                      return Promise.reject(
+                        new Error(
+                          "Không được vượt quá số khách tối đa của phòng"
+                        )
+                      );
+                    }
+                    return Promise.resolve();
+                  },
+                }),
+              ]}
             >
-              <InputNumber min={1} max={10} style={{ width: "100%" }} />
+              <InputNumber
+                min={1}
+                max={roomMaxOccupancy}
+                style={{ width: "100%" }}
+              />
             </Form.Item>
           </Col>
           <Col span={6}>
             <Form.Item
               label="Số khách tối đa"
               name="max_occupancy"
-              rules={[{ required: true, message: "Nhập số khách tối đa" }]}
+              rules={[
+                { required: true, message: "Nhập số khách tối đa" },
+                ({ getFieldValue }) => ({
+                  validator(_, value) {
+                    if (
+                      roomMaxOccupancy !== undefined &&
+                      value > roomMaxOccupancy
+                    ) {
+                      return Promise.reject(
+                        new Error(
+                          "Không được vượt quá số khách tối đa của phòng"
+                        )
+                      );
+                    }
+                    if (value < getFieldValue("base_occupancy")) {
+                      return Promise.reject(
+                        new Error("Số khách tối đa phải ≥ số khách cơ bản")
+                      );
+                    }
+                    return Promise.resolve();
+                  },
+                }),
+              ]}
             >
-              <InputNumber min={1} max={10} style={{ width: "100%" }} />
+              <InputNumber
+                min={1}
+                max={roomMaxOccupancy}
+                style={{ width: "100%" }}
+              />
             </Form.Item>
           </Col>
         </Row>
@@ -184,7 +243,8 @@ const CreateRatePlan = ({ open, onClose, onSuccess, roomTypes }: IProps) => {
                 min={0}
                 step={10000}
                 style={{ width: "100%" }}
-                placeholder="0"
+                placeholder="Ví dụ: 1,200,000"
+                formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}
               />
             </Form.Item>
           </Col>
@@ -194,7 +254,8 @@ const CreateRatePlan = ({ open, onClose, onSuccess, roomTypes }: IProps) => {
                 min={0}
                 step={5000}
                 style={{ width: "100%" }}
-                placeholder="0"
+                placeholder="Ví dụ: 1,200,000"
+                formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}
               />
             </Form.Item>
           </Col>

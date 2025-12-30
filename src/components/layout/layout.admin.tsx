@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import {
   ExceptionOutlined,
   HeartTwoTone,
-  DollarCircleOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
   EnvironmentOutlined,
@@ -12,6 +11,8 @@ import {
   TeamOutlined,
   HomeOutlined,
   PictureOutlined,
+  DollarOutlined,
+  ApartmentOutlined,
 } from "@ant-design/icons";
 import { Layout, Menu, Dropdown, Space, Avatar, Result, Button } from "antd";
 import { Outlet } from "react-router-dom";
@@ -61,6 +62,12 @@ const LayoutAdmin = () => {
         },
       ],
     },
+
+    {
+      label: <Link to="/admin/hotel">Manage Hotel</Link>,
+      key: "hotel",
+      icon: <HomeOutlined />,
+    },
     {
       label: <span>Manage location</span>,
       key: "location",
@@ -84,11 +91,6 @@ const LayoutAdmin = () => {
       ],
     },
     {
-      label: <Link to="/admin/hotel">Manage Hotel</Link>,
-      key: "hotel",
-      icon: <DollarCircleOutlined />,
-    },
-    {
       label: <Link to="/admin/amenity">Manage amenity</Link>,
       key: "amenity",
       icon: <ExceptionOutlined />,
@@ -97,6 +99,16 @@ const LayoutAdmin = () => {
       label: <Link to="/admin/image-moderation">Image Moderation</Link>,
       key: "image-moderation",
       icon: <PictureOutlined />,
+    },
+    {
+      label: <Link to="/admin/room-types">Manage room type</Link>,
+      key: "room-types",
+      icon: <ApartmentOutlined />,
+    },
+    {
+      label: <Link to="/admin/rate-plans">Manage rate plan</Link>,
+      key: "rate-plans",
+      icon: <DollarOutlined />,
     },
   ];
 

@@ -1,16 +1,18 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Button, Card, Radio, Space, Tag, message, Spin, Steps } from "antd";
+import React, { useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { Button, Radio, Spin, App } from "antd";
 import dayjs from "dayjs";
 import {
   cancelHold,
   getBooking,
   reserveBooking,
   startMomoPayment,
+  updatePaymentMethod,
 } from "@/services/api";
 import "./bookingStep2.css";
+import { PaymentSuccessModal } from "./success.modal";
 
-type PaymentMethod = "MOMO" | "PAY_AT_HOTEL";
+type PaymentMethod = "PREPAID" | "PAY_AT_HOTEL";
 
 const STORAGE_KEY = "bookingFlow";
 
@@ -29,10 +31,23 @@ const readFlow = () => {
 };
 
 const BookingStep2: React.FC = () => {
+  const location = useLocation();
+  const dataBooking: any = location.state.dataBooking;
+  const nameHotel: any = location.state.n;
   const navigate = useNavigate();
+  const { message } = App.useApp();
+
   const { bookingId, selection } = readFlow();
   const redirectedOnce = useRef(false);
-  ``;
+
+  const [booking, setBooking] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [holdInfo, setHoldInfo] = useState<any>(null);
+  const [countdownText, setCountdownText] = useState("00:00");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("PREPAID");
+  const [savingPay, setSavingPay] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
+
   useEffect(() => {
     if (!bookingId && !redirectedOnce.current) {
       redirectedOnce.current = true;
@@ -45,17 +60,6 @@ const BookingStep2: React.FC = () => {
     }
   }, [bookingId, selection, navigate]);
 
-  if (!bookingId) return null;
-
-  const [booking, setBooking] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [holdInfo, setHoldInfo] = useState<{
-    reservationCode: string;
-    expiresAt: string;
-  } | null>(null);
-  const [countdown, setCountdown] = useState(0);
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("MOMO");
-  const [savingPay, setSavingPay] = useState(false);
   useEffect(() => {
     const fetchBooking = async () => {
       try {
@@ -83,7 +87,6 @@ const BookingStep2: React.FC = () => {
           expiresAt: data.expiresAt,
         });
         const diff = dayjs(data.expiresAt).diff(dayjs(), "second");
-        setCountdown(diff);
       } catch (e: any) {
         message.error(e?.response?.data?.message || "Không thể giữ phòng");
       } finally {
@@ -94,25 +97,17 @@ const BookingStep2: React.FC = () => {
   }, [booking]);
 
   useEffect(() => {
-    if (!holdInfo) return;
-    const timer = setInterval(() => {
-      setCountdown((prev) => (prev <= 1 ? 0 : prev - 1));
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [holdInfo]);
-
-  useEffect(() => {
     let timer: any;
     async function pollStatus() {
       try {
         const resp = await getBooking(String(bookingId));
-        const latest = resp?.data ?? resp; 
+        const latest = resp?.data ?? resp;
         setBooking(latest);
         if (latest?.status === "PAID") {
           try {
             sessionStorage.removeItem("bookingFlow");
           } catch {}
-          message.success("Thanh toán thành công!");
+          setShowSuccess(true);
           navigate("/", { replace: true });
         }
       } catch {}
@@ -120,14 +115,6 @@ const BookingStep2: React.FC = () => {
     timer = setInterval(pollStatus, 3000);
     return () => clearInterval(timer);
   }, [bookingId, navigate]);
-
-  const fmtCountdown = useCallback(() => {
-    const m = Math.floor(countdown / 60);
-    const s = countdown % 60;
-    return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
-  }, [countdown]);
-
-  const onlineOnly = booking?.prepay_required === 1;
 
   const handleBack = async () => {
     if (booking?.status === "HOLD") {
@@ -139,219 +126,264 @@ const BookingStep2: React.FC = () => {
   };
 
   const handleConfirm = async () => {
-    if (paymentMethod !== "MOMO") {
-      message.info("Bạn đã chọn thanh toán trực tiếp tại khách sạn.");
-      return;
-    }
-    if (holdInfo && countdown <= 0) {
-      message.error("Giữ phòng đã hết hạn");
-      return;
-    }
-
     setSavingPay(true);
     try {
-      const axiosResp = await startMomoPayment(String(bookingId));
-      const payload = axiosResp;
-      if (!payload?.payUrl) {
-        message.error("Không nhận được payUrl từ MoMo");
-        return;
+      if (paymentMethod === "PAY_AT_HOTEL") {
+        const res = await updatePaymentMethod(String(bookingId), paymentMethod);
+        if (res) {
+          setShowSuccess(true);
+          setTimeout(() => {
+            sessionStorage.removeItem("bookingFlow");
+          }, 10000);
+          navigate("/retrieve");
+          return;
+        }
       }
-      window.location.href = String(payload.payUrl);
+      if (paymentMethod === "PREPAID") {
+        const axiosResp = await startMomoPayment(String(bookingId));
+        const payload = axiosResp;
+
+        if (!payload?.payUrl) {
+          message.error("Không nhận được payUrl từ MoMo");
+          return;
+        }
+        window.location.href = String(payload.payUrl);
+      }
     } catch (e: any) {
       message.error(
         e?.response?.data?.message ||
           e?.message ||
-          "Không thể bắt đầu thanh toán MoMo"
+          "Không thể bắt đầu thanh toán"
       );
     } finally {
       setSavingPay(false);
     }
   };
 
+  useEffect(() => {
+    if (!dataBooking?.payment_expired_at) return;
+    let timer: any;
+    const tick = () => {
+      const now = Date.now();
+      const expiredAt = new Date(dataBooking.payment_expired_at).getTime();
+      const remain = expiredAt - now;
+      if (remain <= 0) {
+        setCountdownText("00:00");
+        try {
+          sessionStorage.removeItem("bookingFlow");
+        } catch {}
+        message.error("Đã hết thời gian thanh toán");
+        navigate(-1);
+
+        return;
+      }
+      const totalSeconds = Math.floor(remain / 1000);
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = totalSeconds % 60;
+      setCountdownText(
+        `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(
+          2,
+          "0"
+        )}`
+      );
+      const delay = 1000 - (now % 1000);
+      timer = setTimeout(tick, delay);
+    };
+
+    tick();
+
+    return () => clearTimeout(timer);
+  }, [dataBooking?.payment_expired_at, navigate]);
+
   return (
-    <div className="pay-page">
-      <header className="pay-header">
-        <div className="pay-header-inner">
-          <div className="timer">
-            <span>Hoàn tất thanh toán của bạn bằng </span>
-            <span className="timer-pill">{fmtCountdown()}</span>
-          </div>
-        </div>
-      </header>
-
-      <main className="pay-main">
-        <div className="pay-left">
-          <h1 className="pay-title">Bạn muốn thanh toán thế nào?</h1>
-
-          <div className="pay-panel">
-            {loading ? (
-              <div className="panel-loading">
-                <Spin />
+    <>
+      {!bookingId ? null : (
+        <div className="pay-page">
+          <header className="pay-header">
+            <div className="pay-header-inner">
+              <div className="timer">
+                <span>Hoàn tất thanh toán của bạn bằng </span>
+                <span className="timer-pill">{countdownText}</span>
               </div>
-            ) : (
-              <>
-                {booking?.status === "HOLD" && holdInfo ? (
-                  <div className="hold-banner">
-                    <span className="hold-label">Mã giữ</span>{" "}
-                    {holdInfo.reservationCode}
-                    <span className="hold-exp">
-                      Hết hạn sau: <b>{fmtCountdown()}</b>
-                    </span>
+            </div>
+          </header>
+
+          <main className="pay-main">
+            <div className="pay-left">
+              <h1 className="pay-title">Bạn muốn thanh toán thế nào?</h1>
+
+              <div className="pay-panel">
+                {loading ? (
+                  <div className="panel-loading">
+                    <Spin />
                   </div>
                 ) : (
-                  <div className="hold-banner muted">
-                    Trạng thái: {booking?.status}
-                  </div>
-                )}
-
-                <Radio.Group
-                  value={paymentMethod}
-                  onChange={(e) => setPaymentMethod(e.target.value)}
-                  className="method-group"
-                >
-                  <label
-                    className={`method-item ${
-                      paymentMethod === "MOMO" ? "selected" : ""
-                    }`}
-                  >
-                    <Radio value="MOMO" />
-                    <div className="method-body">
-                      <div className="method-row">
-                        <span className="method-title">MoMo</span>
-                        <span className="badge badge-green">Online nhanh</span>
-                      </div>
-                      <ul className="method-desc">
-                        <li>
-                          Thanh toán dễ dàng bằng mã QR trên ứng dụng MoMo.
-                        </li>
-                        <li>
-                          Sau khi bấm “Thanh toán & Hiển thị mã QR”, hệ thống sẽ
-                          chuyển đến trang MoMo.
-                        </li>
-                        <li>
-                          Trạng thái sẽ tự cập nhật khi MoMo gửi IPN về hệ
-                          thống.
-                        </li>
-                      </ul>
-                    </div>
-                  </label>
-
-                  <label
-                    className={`method-item ${
-                      paymentMethod === "PAY_AT_HOTEL" ? "selected" : ""
-                    }`}
-                  >
-                    <Radio value="PAY_AT_HOTEL" />
-                    <div className="method-body">
-                      <div className="method-row">
-                        <span className="method-title">
-                          Thanh toán trực tiếp
+                  <>
+                    {booking?.status === "HOLD" && holdInfo ? (
+                      <div className="hold-banner">
+                        <span className="hold-label">Mã giữ</span>{" "}
+                        {holdInfo.reservationCode}
+                        <span className="hold-exp">
+                          <span className="timer-pill">{countdownText}</span>
                         </span>
-                        <span className="badge badge-blue">Trả sau</span>
                       </div>
-                      <ul className="method-desc">
-                        <li>Thanh toán tại quầy khi nhận phòng.</li>
-                        <li>Áp dụng theo chính sách của khách sạn.</li>
-                      </ul>
+                    ) : (
+                      <div className="hold-banner muted">
+                        Trạng thái: {booking?.status}
+                      </div>
+                    )}
+
+                    <Radio.Group
+                      value={paymentMethod}
+                      onChange={(e) => setPaymentMethod(e.target.value)}
+                      className="method-group"
+                    >
+                      <label
+                        className={`method-item ${
+                          paymentMethod === "PREPAID" ? "selected" : ""
+                        }`}
+                      >
+                        <Radio value="PREPAID" />
+                        <div className="method-body">
+                          <div className="method-row">
+                            <span className="method-title">MoMo</span>
+                            <span className="badge badge-green">
+                              Online nhanh
+                            </span>
+                          </div>
+                          <ul className="method-desc">
+                            <li>
+                              Thanh toán dễ dàng bằng mã QR trên ứng dụng MoMo.
+                            </li>
+                            <li>
+                              Sau khi bấm “Thanh toán & Hiển thị mã QR”, hệ
+                              thống sẽ chuyển đến trang MoMo.
+                            </li>
+                            <li>
+                              Trạng thái sẽ tự cập nhật khi MoMo gửi IPN về hệ
+                              thống.
+                            </li>
+                          </ul>
+                        </div>
+                      </label>
+
+                      <label
+                        className={`method-item ${
+                          paymentMethod === "PAY_AT_HOTEL" ? "selected" : ""
+                        }`}
+                      >
+                        <Radio value="PAY_AT_HOTEL" />
+                        <div className="method-body">
+                          <div className="method-row">
+                            <span className="method-title">
+                              Thanh toán trực tiếp
+                            </span>
+                            <span className="badge badge-blue">Trả sau</span>
+                          </div>
+                          <ul className="method-desc">
+                            <li>Thanh toán tại quầy khi nhận phòng.</li>
+                            <li>Áp dụng theo chính sách của khách sạn.</li>
+                          </ul>
+                        </div>
+                      </label>
+                    </Radio.Group>
+
+                    <div className="coupon-row">
+                      <button className="plain-btn">+ Thêm mã giảm</button>
                     </div>
-                  </label>
-                </Radio.Group>
+                  </>
+                )}
+              </div>
 
-                <div className="coupon-row">
-                  <button className="plain-btn">+ Thêm mã giảm</button>
+              <div className="pay-summary-total">
+                <div className="total-line">
+                  <span>Tổng giá tiền</span>
+                  <span className="total-amount">
+                    {Number(booking?.amount ?? 0).toLocaleString("vi-VN")} VND
+                  </span>
                 </div>
-              </>
-            )}
-          </div>
+                <div className="cta-row">
+                  <Button
+                    className="cta-btn"
+                    type="primary"
+                    loading={savingPay}
+                    onClick={handleConfirm}
+                  >
+                    {paymentMethod === "PREPAID"
+                      ? "Thanh toán & Hiển thị mã QR"
+                      : "Xác nhận phương thức"}
+                  </Button>
+                  <Button className="back-btn" onClick={handleBack}>
+                    Trở về
+                  </Button>
+                </div>
+                <div className="terms">
+                  Bằng cách tiếp tục thanh toán, bạn đã đồng ý Điều khoản &
+                  Chính sách quyền riêng tư.
+                </div>
+              </div>
+            </div>
 
-          <div className="pay-summary-total">
-            <div className="total-line">
-              <span>Tổng giá tiền</span>
-              <span className="total-amount">
-                {Number(booking?.amount ?? 0).toLocaleString("vi-VN")} VND
-              </span>
-            </div>
-            <div className="cta-row">
-              <Button
-                className="cta-btn"
-                type="primary"
-                loading={savingPay}
-                onClick={handleConfirm}
-              >
-                {paymentMethod === "MOMO"
-                  ? "Thanh toán & Hiển thị mã QR"
-                  : "Xác nhận phương thức"}
-              </Button>
-              <Button className="back-btn" onClick={handleBack}>
-                Trở về
-              </Button>
-            </div>
-            <div className="terms">
-              Bằng cách tiếp tục thanh toán, bạn đã đồng ý Điều khoản & Chính
-              sách quyền riêng tư.
-            </div>
-          </div>
+            <aside className="pay-right">
+              <div className="hotel-card">
+                <div className="hotel-card-header">
+                  <div className="booking-code">
+                    Mã đặt chỗ: <b>{dataBooking?.reservation_code}</b>
+                  </div>
+                </div>
+                <div className="hotel-card-body">
+                  <div className="hotel-name">{nameHotel.hotel_name}</div>
+                  <div className="stay-dates">
+                    Nhận phòng: <b>{dataBooking?.checkin_date}</b>
+                    <br />
+                    Trả phòng: <b>{dataBooking?.checkout_date}</b>
+                    <br />
+                    {dataBooking?.nights} đêm • {dataBooking?.rooms} phòng •{" "}
+                    {dataBooking?.adults} khách
+                  </div>
+                  <div className="guest-info">
+                    <div className="guest-title">Tên khách</div>
+                    <div className="guest-value">
+                      {dataBooking?.guest_name || selection?.contactName}
+                    </div>
+                  </div>
+                  <div className="contact-info">
+                    <div className="guest-title">Chi tiết người liên lạc</div>
+                    <div className="guest-value">
+                      {dataBooking?.contact_name} • {dataBooking?.contact_email}{" "}
+                      • {dataBooking?.contact_phone}
+                    </div>
+                  </div>
+                  {dataBooking?.special_requests && (
+                    <div className="requests">
+                      Yêu cầu đặc biệt:{" "}
+                      {Array.isArray(booking?.special_requests)
+                        ? booking.special_requests.join(", ")
+                        : (() => {
+                            try {
+                              return JSON.parse(booking.special_requests).join(
+                                ", "
+                              );
+                            } catch {
+                              return "";
+                            }
+                          })()}
+                    </div>
+                  )}
+                </div>
+                <div className="hotel-card-footer">
+                  Sự lựa chọn tuyệt vời cho kỳ nghỉ của bạn!
+                </div>
+              </div>
+            </aside>
+          </main>
         </div>
-
-        <aside className="pay-right">
-          <div className="hotel-card">
-            <div className="hotel-card-header">
-              <div className="booking-code">
-                Mã đặt chỗ: <b>{booking?.id}</b>
-              </div>
-            </div>
-            <div className="hotel-card-body">
-              <div className="hotel-name">Mia Saigon Luxury Boutique Hotel</div>
-              <div className="stay-dates">
-                Nhận phòng: <b>{booking?.checkin_date}</b>
-                <br />
-                Trả phòng: <b>{booking?.checkout_date}</b>
-                <br />
-                {booking?.nights} đêm • {booking?.rooms} phòng •{" "}
-                {booking?.adults} khách
-              </div>
-              <ul className="hotel-features">
-                <li>WiFi miễn phí</li>
-                <li>Bữa sáng cho 2 người</li>
-                <li>Miễn phí hủy phòng (nếu có)</li>
-              </ul>
-              <div className="guest-info">
-                <div className="guest-title">Tên khách</div>
-                <div className="guest-value">
-                  {booking?.guest_name || selection?.contactName}
-                </div>
-              </div>
-              <div className="contact-info">
-                <div className="guest-title">Chi tiết người liên lạc</div>
-                <div className="guest-value">
-                  {booking?.contact_name} • {booking?.contact_email} •{" "}
-                  {booking?.contact_phone}
-                </div>
-              </div>
-              {booking?.special_requests && (
-                <div className="requests">
-                  Yêu cầu đặc biệt:{" "}
-                  {Array.isArray(booking?.special_requests)
-                    ? booking.special_requests.join(", ")
-                    : (() => {
-                        try {
-                          return JSON.parse(booking.special_requests).join(
-                            ", "
-                          );
-                        } catch {
-                          return "";
-                        }
-                      })()}
-                </div>
-              )}
-            </div>
-            <div className="hotel-card-footer">
-              Sự lựa chọn tuyệt vời cho kỳ nghỉ của bạn!
-            </div>
-          </div>
-        </aside>
-      </main>
-    </div>
+      )}
+      <PaymentSuccessModal
+        open={showSuccess}
+        onDone={() => navigate("/", { replace: true })}
+      />
+    </>
   );
 };
 

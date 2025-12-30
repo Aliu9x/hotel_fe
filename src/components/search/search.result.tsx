@@ -1,15 +1,12 @@
-import React, { useEffect, useMemo, useState, useCallback } from "react";
+import React, { useEffect,  useState, useCallback } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import {
   Slider,
   Button,
-  Tag,
   Space,
   message,
-  Spin,
   Checkbox,
   Radio,
-  Divider,
   Skeleton,
 } from "antd";
 import "./search-results.scss";
@@ -24,18 +21,13 @@ import { searchAvailability, getAmenitySearch } from "@/services/api";
 
 type SortOption = "price_asc" | "price_desc";
 
-const flexibleOptions = [
-  { label: "Miễn phí hủy phòng", value: "free_cancellation" },
-  { label: "Thanh toán tại khách sạn", value: "pay_at_hotel" },
-];
 const IMG_PREFIX = import.meta.env.VITE_BACKEND_URL as string;
-const buildUrl = (f?: string) => (f ? `${IMG_PREFIX}/images/hotel/${f}` : undefined);
+const buildUrl = (f?: string) =>
+  f ? `${IMG_PREFIX}/images/hotel/${f}` : undefined;
 
-const DEFAULT_PRICE_RANGE: [number, number] = [0, 20000000]; // FE range, map sang minPrice/maxPrice
+const DEFAULT_PRICE_RANGE: [number, number] = [0, 20000000];
 const DEFAULT_STAR_RANGE: [number, number] = [0, 5];
-const DEFAULT_SORT: SortOption = "price_desc"; // mặc định giá giảm dần
-
-const SHOW_COUNT = 5;
+const DEFAULT_SORT: SortOption = "price_desc";
 
 const SearchResults: React.FC = () => {
   const navigate = useNavigate();
@@ -50,7 +42,6 @@ const SearchResults: React.FC = () => {
   >(navState?.availability);
   const [loading, setLoading] = useState(false);
 
-  // Range filters (FE state)
   const [priceRange, setPriceRange] = useState<[number, number]>([
     Number(searchParams.get("minPrice")) || DEFAULT_PRICE_RANGE[0],
     Number(searchParams.get("maxPrice")) || DEFAULT_PRICE_RANGE[1],
@@ -60,7 +51,6 @@ const SearchResults: React.FC = () => {
     Number(searchParams.get("maxStar")) || DEFAULT_STAR_RANGE[1],
   ]);
 
-  // Checkbox filters
   const initialRoomAmenityIds = (searchParams.getAll("roomAmenityIds") || [])
     .map((v) => Number(v))
     .filter((n) => !Number.isNaN(n));
@@ -68,7 +58,6 @@ const SearchResults: React.FC = () => {
     initialRoomAmenityIds
   );
 
-  // Hotel amenities: convert sang number[]
   const initialHotelAmenityIds = (searchParams.getAll("hotelAmenityIds") || [])
     .map((v) => Number(v))
     .filter((n) => !Number.isNaN(n));
@@ -76,22 +65,15 @@ const SearchResults: React.FC = () => {
     initialHotelAmenityIds
   );
 
-  // Flexible: map sang booleans
   const [flexible, setFlexible] = useState<string[]>(
     searchParams.getAll("flexible") || []
   );
 
-  // Sort FE radio -> BE sortPrice
   const [sort, setSort] = useState<SortOption>(
     (searchParams.get("sort") as SortOption) || DEFAULT_SORT
   );
 
-  const sortLabel = useMemo(
-    () => (sort === "price_asc" ? "Giá thấp nhất" : "Giá cao nhất"),
-    [sort]
-  );
 
-  // ====== Load Amenities theo applies_to ======
   const [roomAmenitiesOptions, setRoomAmenitiesOptions] = useState<
     { label: string; value: string }[]
   >([]);
@@ -100,25 +82,19 @@ const SearchResults: React.FC = () => {
   >([]);
   const [amenityLoading, setAmenityLoading] = useState(false);
 
-  // ... các import và state giữ nguyên
-
   useEffect(() => {
     let mounted = true;
     setAmenityLoading(true);
 
     const loadAmenities = async () => {
       try {
-        // Gọi song song 2 API
         const [roomRes, hotelRes] = await Promise.all([
-          getAmenitySearch("Room"), // roomtype
+          getAmenitySearch("Room"),
           getAmenitySearch("Hotel"),
         ]);
 
-        // Tùy thuộc vào axios wrapper, có thể là roomRes.data hoặc roomRes.data.data
         const roomData = roomRes?.data ?? roomRes?.data ?? [];
         const hotelData = hotelRes?.data ?? hotelRes?.data ?? [];
-
-        // Map đúng dạng phẳng: [{id, name}]
         const roomList: { label: string; value: string }[] = roomData.map(
           (a: any) => ({
             label: a.name,
@@ -149,7 +125,6 @@ const SearchResults: React.FC = () => {
       mounted = false;
     };
   }, []);
-  // ====== Tải AVAILABILITY ban đầu từ URL ======
   useEffect(() => {
     if (!availability) {
       const parsed = parseAvailabilityParamsFromURL(location.search);
@@ -171,18 +146,15 @@ const SearchResults: React.FC = () => {
     }
   }, [availability, location.search]);
 
-  // Build params đúng DTO BE
   const buildParamsFromState = (): IAvailabilityParams | undefined => {
     if (!availability) return undefined;
     const meta = availability.meta;
 
-    const refundableOnly = flexible.includes("free_cancellation") || undefined;
-    const payAtHotelOnly = flexible.includes("pay_at_hotel") || undefined;
+    // const refundableOnly = flexible.includes("free_cancellation") || undefined;
+    // const payAtHotelOnly = flexible.includes("pay_at_hotel") || undefined;
 
-    // Map sort  -> BE sortPrice
     const sortPrice: "asc" | "desc" = sort === "price_asc" ? "asc" : "desc";
 
-    // Parse mảng id string -> number[]
     const toNumArray = (vals: (string | number)[]): number[] | undefined => {
       const arr = vals.map((v) => Number(v)).filter((n) => !Number.isNaN(n));
       return arr.length ? arr : undefined;
@@ -209,27 +181,22 @@ const SearchResults: React.FC = () => {
         ? Number(searchParams.get("wardId"))
         : undefined,
 
-      // amenities
       roomAmenityIds: toNumArray(roomAmenityIds),
       hotelAmenityIds: toNumArray(hotelAmenityIds),
-
-      // ranges
       minStar: starRange[0] || undefined,
       maxStar: starRange[1] || undefined,
       minPrice: priceRange[0] || undefined,
       maxPrice: priceRange[1] || undefined,
 
       // flexible
-      refundableOnly,
-      payAtHotelOnly,
+      // refundableOnly,
+      // payAtHotelOnly,
 
-      // sort
       sortPrice,
     };
 
     return params;
   };
-
   const applyFilters = useCallback(async () => {
     const params = buildParamsFromState();
     if (!params) return;
@@ -347,21 +314,6 @@ const SearchResults: React.FC = () => {
               onChange={(v) => setStarRange(v as [number, number])}
             />
           </div>
-
-          {/* Linh hoạt: refundableOnly & payAtHotelOnly */}
-          <div className="sr-panel">
-            <div className="sr-panel__header">
-              <span className="sr-panel__title">Linh hoạt hơn</span>
-            </div>
-            {renderCheckboxGroup(
-              flexibleOptions,
-              flexible as any,
-              (vals) => setFlexible(vals as any[]),
-              "flexible"
-            )}
-          </div>
-
-          {/* Tiện nghi phòng (Room) */}
           <div className="sr-panel">
             <div className="sr-panel__header">
               <span className="sr-panel__title">Tiện nghi phòng</span>
@@ -377,8 +329,6 @@ const SearchResults: React.FC = () => {
               )
             )}
           </div>
-
-          {/* Tiện nghi khách sạn (Hotel) */}
           <div className="sr-panel">
             <div className="sr-panel__header">
               <span className="sr-panel__title">Tiện nghi khách sạn</span>
@@ -394,8 +344,6 @@ const SearchResults: React.FC = () => {
               )
             )}
           </div>
-
-          {/* Reset */}
           <div className="sr-panel">
             <Button block onClick={resetAllFilters}>
               Đặt lại tất cả bộ lọc
@@ -416,26 +364,6 @@ const SearchResults: React.FC = () => {
               </Radio.Group>
             </Space>
           </div>
-          {/* 
-          <div className="sr-metaBar">
-            {availability ? (
-              <Space size={[8, 8]} wrap>
-                <Tag color="blue">
-                  {availability.meta.checkin} → {availability.meta.checkout} (
-                  {availability.meta.nights} đêm)
-                </Tag>
-                <Tag color="geekblue">
-                  Phòng: {availability.meta.requested_rooms}
-                </Tag>
-                <Tag color="green">NL: {availability.meta.adults}</Tag>
-                <Tag color="orange">TE: {availability.meta.children}</Tag>
-                <Tag color="purple">Tổng: {availability.meta.total_guests}</Tag>
-                <Tag>{sortLabel}</Tag>
-              </Space>
-            ) : (
-              <Spin size="small" />
-            )}
-          </div> */}
           <div className="sr-hotelList">
             {!availability && (
               <div className="sr-hotelList__empty">Đang tải...</div>
@@ -451,7 +379,7 @@ const SearchResults: React.FC = () => {
                   ? (h as any).images
                   : [];
                 const main = imgs[0];
-                const thumbs = imgs.slice(1, 4); // 3 ảnh nhỏ
+                const thumbs = imgs.slice(1, 4);
                 const extraCount = Math.max(0, imgs.length - 4);
 
                 return (
@@ -460,15 +388,11 @@ const SearchResults: React.FC = () => {
                     className="sr-hotelCard"
                     style={{ cursor: "pointer" }}
                     onClick={() => {
-                      const meta = availability.meta;
-                      const qs = new URLSearchParams({
-                        checkin: meta.checkin,
-                        checkout: meta.checkout,
-                        adults: String(meta.adults),
-                        children: String(meta.children),
-                        rooms: String(meta.requested_rooms),
-                      }).toString();
-                      navigate(`/hotel/${h.hotel_id}?${qs}`);
+                      const hotels = availability.hotels;
+                      console.log(hotels);
+                      navigate(`/hotel-detail/${h.hotel_id}`, {
+                        state: { hotel: h, meta: availability.meta },
+                      });
                     }}
                   >
                     <div className="sr-hotelCard__imageWrap">
@@ -536,7 +460,16 @@ const SearchResults: React.FC = () => {
                     <div className="sr-hotelCard__priceArea">
                       <div className="sr-priceBlock"></div>
                       <Button type="primary" size="small">
-                        {h.hotel_min_price}
+                        {(() => {
+                          const prices = h.matched_room_types.flatMap(
+                            (room) =>
+                              room.rate_plans?.map((rp) => rp.nightly_total) ??
+                              []
+                          );
+                          return ` ${Math.min(
+                            ...prices
+                          ).toLocaleString()} VND / đêm`;
+                        })()}
                       </Button>
                     </div>
                   </div>

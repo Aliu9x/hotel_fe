@@ -5,7 +5,7 @@ import dayjs, { Dayjs } from 'dayjs';
 const { Text } = Typography;
 
 interface InventoryCalendarProps {
-  inventories: IInventory[] | any; // tạm thời nới lỏng để debug
+  inventories: IInventory[] | any; 
   onCellClick?: (inv: IInventory | null, dateISO: string) => void;
 }
 
@@ -13,7 +13,6 @@ export const InventoryCalendar: React.FC<InventoryCalendarProps> = ({
   inventories,
   onCellClick,
 }) => {
-  // Bảo vệ nếu inventories không phải array
   const safeInventories: IInventory[] = Array.isArray(inventories) ? inventories : [];
 
   const mapByDate = useMemo(() => {

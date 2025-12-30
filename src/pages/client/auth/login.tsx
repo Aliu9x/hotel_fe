@@ -40,6 +40,9 @@ const LoginPage = () => {
       if (user?.role === "HOTEL_OWNER") {
         navigate("/partner/dashboard");
       }
+      if (user?.role === "CUSTOMER") {
+        navigate("/");
+      }
     } else {
       message.error(res.message);
     }

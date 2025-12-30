@@ -1,51 +1,81 @@
-import { createContext, useContext, useState } from "react";
+import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { fetchAccountApi } from "@/services/api";
 
-interface IAppContext {
-  isAuthenticated: boolean;
+type User = {
+  id: string;
+  email: string;
+  role: "ADMIN" | "HOTEL_OWNER" | "CUSTOMER";
+  avatar?: string;
+  // ...các field khác
+} | null;
+
+type AppContextType = {
+  isAuthenticated: boolean | null; // null = chưa biết, đang bootstrap
   setIsAuthenticated: (v: boolean) => void;
-  setUser: (v: IUser | null) => void;
-  user: IUser | null;
-  isAppLoading: boolean;
+  user: User;
+  setUser: (u: User) => void;
+  isAppLoading: boolean; // true khi đang bootstrap
   setIsAppLoading: (v: boolean) => void;
-}
-
-const CurrentAppContext = createContext<IAppContext | null>(null);
-
-type TProps = {
-  children: React.ReactNode;
+  refreshAccount: () => Promise<void>;
 };
 
-export const AppProvider = (props: TProps) => {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
-  const [user, setUser] = useState<IUser | null>(null);
-  const [isAppLoading, setIsAppLoading] = useState<boolean>(false);
+const AppContext = createContext<AppContextType | undefined>(undefined);
 
-  return (
-    <>
-      <CurrentAppContext.Provider
-        value={{
-          isAuthenticated,
-          user,
-          setIsAuthenticated,
-          setUser,
-          isAppLoading,
-          setIsAppLoading,
-        }}
-      >
-        {props.children}
-      </CurrentAppContext.Provider>
-    </>
+export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [user, setUser] = useState<User>(null);
+  const [isAppLoading, setIsAppLoading] = useState<boolean>(true);
+
+  const refreshAccount = async () => {
+    const token = localStorage.getItem("access_token");
+    if (!token) {
+      setUser(null);
+      setIsAuthenticated(false);
+      setIsAppLoading(false);
+      return;
+    }
+
+    setIsAppLoading(true);
+    try {
+      const res = await fetchAccountApi();
+      if (res?.data?.user) {
+        setUser(res.data.user);
+        setIsAuthenticated(true);
+      } else {
+        setUser(null);
+        setIsAuthenticated(false);
+      }
+    } catch (e) {
+      setUser(null);
+      setIsAuthenticated(false);
+    } finally {
+      setIsAppLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    // Bootstrap ngay khi app mount
+    refreshAccount();
+  }, []);
+
+  const value = useMemo(
+    () => ({
+      isAuthenticated,
+      setIsAuthenticated: (v: boolean) => setIsAuthenticated(v),
+      user,
+      setUser,
+      isAppLoading,
+      setIsAppLoading,
+      refreshAccount,
+    }),
+    [isAuthenticated, user, isAppLoading]
   );
+
+  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 };
 
 export const useCurrentApp = () => {
-  const currentAppContext = useContext(CurrentAppContext);
-
-  if (!currentAppContext) {
-    throw new Error(
-      "useCurrentApp has to be used within <CurrentAppContext.Provider>"
-    );
-  }
-
-  return currentAppContext;
+  const ctx = useContext(AppContext);
+  if (!ctx) throw new Error("useCurrentApp must be used within AppProvider");
+  return ctx;
 };

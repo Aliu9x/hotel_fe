@@ -1,6 +1,7 @@
 import {
   commitUpload,
   createAmenityMappings,
+  getAllRoomCategory,
   getAmenityCategory,
   getAmenityMappings,
   loadImageRoomType,
@@ -23,6 +24,7 @@ import {
   InputNumber,
   Modal,
   Row,
+  Select,
   Switch,
   Upload,
   type FormProps,
@@ -45,8 +47,12 @@ interface IProps {
   setOpenViewUpdate: (v: boolean) => void;
   refreshTable: () => void;
 }
+type RoomTypeCategory = {
+  id: number;
+  name: string;
+};
 
-const ROOM_TYPE_SLIDER_MAX = 10;
+const ROOM_TYPE_SLIDER_MAX = 20;
 
 export const UpdateRoomType = (props: IProps) => {
   const {
@@ -72,7 +78,17 @@ export const UpdateRoomType = (props: IProps) => {
 
   const [categories, setCategories] = useState<ICategory[]>([]);
   const [selectedAmenity, setSelectedAmenity] = useState<string[]>([]);
+  const [selectedRoomTypeCategory, setSelectedRoomTypeCategory] = useState<
+    RoomTypeCategory[]
+  >([]);
+  useEffect(() => {
+    const fetchData = async () => {
+      const res = await getAllRoomCategory();
+      if (res?.data) setSelectedRoomTypeCategory(res.data);
+    };
 
+    fetchData();
+  }, []);
   const onClose = () => [
     setOpenViewUpdate(false),
     form.resetFields(),
@@ -98,14 +114,11 @@ export const UpdateRoomType = (props: IProps) => {
   }, []);
 
   const genId = () => (crypto?.randomUUID ? crypto.randomUUID() : uuidv4());
-
-  // Load tiện ích đã chọn + ảnh hiện tại
   useEffect(() => {
     if (!dataUpdate?.id) return;
     let cancelled = false;
     (async () => {
       try {
-        // Amenity mappings
         const res = await getAmenityMappings(dataUpdate.id);
         if (!cancelled && res?.data) {
           const selectedIds: string[] = [];
@@ -122,7 +135,6 @@ export const UpdateRoomType = (props: IProps) => {
           setSelectedAmenity(uniqueIds);
         }
 
-        // Load ảnh hiện tại
         const resImage = await loadImageRoomType(dataUpdate.id);
         if (resImage && !cancelled) {
           const toUploadItem = (filename: string): UploadFile => ({
@@ -149,8 +161,7 @@ export const UpdateRoomType = (props: IProps) => {
               (s): s is string => typeof s === "string" && s.trim().length > 0
             )
             .map((s) => toUploadItem(s.trim()));
-
-          // Fill form và state
+          console.log(dataUpdate);
           form.setFieldsValue({
             id: dataUpdate.id,
             name: dataUpdate.name,
@@ -170,16 +181,12 @@ export const UpdateRoomType = (props: IProps) => {
           setFileListThumbnail(arrThumbnail as any);
           setFileListSlider(arrSlider as any);
         }
-      } catch (e) {
-        // ignore
-      }
+      } catch (e) {}
     })();
     return () => {
       cancelled = true;
     };
   }, [dataUpdate?.id, form]);
-
-  // Chuẩn hóa payload commit như tạo mới: tập cuối cùng mong muốn (cũ + mới)
   const thumbnailFiles = useMemo(
     () =>
       fileListThumbnail.map((f) => ({
@@ -201,8 +208,6 @@ export const UpdateRoomType = (props: IProps) => {
   const onFinish: FormProps<IRoomType>["onFinish"] = async (value) => {
     try {
       setIsSubmit(true);
-
-      // Ràng buộc ảnh
       if (thumbnailFiles.length !== 1) {
         message.error("Ảnh bìa phải có đúng 1 ảnh");
         setIsSubmit(false);
@@ -218,8 +223,6 @@ export const UpdateRoomType = (props: IProps) => {
         setIsSubmit(false);
         return;
       }
-
-      // Payload update nội dung (không liên quan ảnh)
       const payload = { ...(value as any) };
       delete payload.thumbnail;
       delete payload.slider;
@@ -232,8 +235,6 @@ export const UpdateRoomType = (props: IProps) => {
 
       if (res?.data) {
         await createAmenityMappings(res.data.id, selectedAmenity);
-
-        // Commit ảnh y như tạo mới (tập cuối cùng mong muốn)
         const sliderPayload = {
           folderType: Folder.ROOM_TYPE_SLIDER,
           roomTypeId: dataUpdate?.id,
@@ -310,11 +311,9 @@ export const UpdateRoomType = (props: IProps) => {
 
   const handleRemove = async (file: UploadFile, type: UserUploadType) => {
     if (type === "thumbnail") {
-      // Xóa ảnh bìa hiện tại khỏi danh sách cuối cùng
       setFileListThumbnail([]);
     }
     if (type === "slider") {
-      // Xóa ảnh không gian khỏi danh sách cuối cùng
       const newSlider = fileListSlider.filter((x) => x.uid !== file.uid);
       setFileListSlider(newSlider);
     }
@@ -334,7 +333,7 @@ export const UpdateRoomType = (props: IProps) => {
       if (res?.data) {
         const uploadedFile: UploadFile = {
           uid: (file as any).uid,
-          name: res.data.fileUploaded, // tên file trong tmp -> tmpFileName khi commit
+          name: res.data.fileUploaded,
           status: "done",
           url: `${import.meta.env.VITE_BACKEND_URL}/images/tmp/${
             res.data.fileUploaded
@@ -342,10 +341,8 @@ export const UpdateRoomType = (props: IProps) => {
         };
 
         if (type === "thumbnail") {
-          // Thay thế hoàn toàn ảnh bìa (luôn tối đa 1)
           setFileListThumbnail([uploadedFile]);
         } else {
-          // Bảo vệ giới hạn tối đa 10 ảnh không gian
           const next = fileListSlider.length + 1;
           if (next > ROOM_TYPE_SLIDER_MAX) {
             message.error(`Ảnh không gian tối đa ${ROOM_TYPE_SLIDER_MAX} ảnh`);
@@ -395,16 +392,15 @@ export const UpdateRoomType = (props: IProps) => {
         >
           <Divider orientation="left">Thông tin chung</Divider>
           <Row gutter={16}>
-            <Form.Item label="id" name="id" hidden></Form.Item>
             <Col span={12}>
-              <Form.Item
-                label="Tên loại phòng"
-                name="name"
-                rules={[
-                  { required: true, message: "Vui lòng nhập tên loại phòng" },
-                ]}
-              >
-                <Input placeholder="VD: Phòng Deluxe Hướng Biển" />
+              <Form.Item name="id_category" label="Loại phòng">
+                <Select
+                  placeholder="Chọn loại phòng"
+                  options={selectedRoomTypeCategory.map((item) => ({
+                    label: item.name,
+                    value: String(item.id),
+                  }))}
+                />
               </Form.Item>
             </Col>
             <Col span={12}>
@@ -447,7 +443,6 @@ export const UpdateRoomType = (props: IProps) => {
                 <InputNumber min={0} style={{ width: "100%" }} />
               </Form.Item>
             </Col>
-     
           </Row>
 
           <Divider orientation="left">Cấu hình phòng</Divider>

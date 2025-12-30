@@ -1,45 +1,17 @@
 import { Button, Result } from "antd";
 import { Link, useLocation } from "react-router-dom";
 import { useCurrentApp } from "../context/app.context";
-import { useEffect } from "react";
-import { fetchAccountApi } from "@/services/api";
 
 interface IProps {
   children: React.ReactNode;
 }
 
 export const ProtectedRoute = (props: IProps) => {
-  const {
-    isAuthenticated,
-    setIsAuthenticated,
-    user,
-    setUser,
-    isAppLoading,
-    setIsAppLoading,
-  } = useCurrentApp();
-
+  const { isAuthenticated, user, isAppLoading } = useCurrentApp();
   const location = useLocation();
 
-  useEffect(() => {
-    const loadAccount = async () => {
-      setIsAppLoading(true);
-      const res = await fetchAccountApi();
-
-      if (res?.data?.user) {
-        setUser(res.data.user);
-        setIsAuthenticated(true);
-      }
-
-      setIsAppLoading(false);
-    };
-
-    if (!isAuthenticated && !user) {
-      loadAccount();
-    }
-  }, []);
-
-  // ❗Loading khi fetch account
-  if (isAppLoading) {
+  // Đang bootstrap → show loading, tránh flash Not Login
+  if (isAppLoading || isAuthenticated === null) {
     return (
       <div
         style={{
@@ -54,8 +26,7 @@ export const ProtectedRoute = (props: IProps) => {
     );
   }
 
-
-  if (isAuthenticated === false) {
+  if (!isAuthenticated) {
     return (
       <Result
         status="404"
@@ -71,7 +42,7 @@ export const ProtectedRoute = (props: IProps) => {
   }
 
   const isAdminRoute = location.pathname.includes("admin");
-  if (isAdminRoute && user?.role === "USER") {
+  if (isAdminRoute && user?.role === "CUSTOMER") {
     return (
       <Result
         status="403"
