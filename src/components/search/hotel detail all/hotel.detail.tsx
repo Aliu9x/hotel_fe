@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation, useParams } from "react-router-dom";
 
 import {
   Tag,
@@ -11,6 +11,7 @@ import {
   Rate,
   Tooltip,
   Carousel,
+  Modal,
 } from "antd";
 import {
   EnvironmentOutlined,
@@ -36,7 +37,12 @@ import type {
   RatePlanPrice,
   RoomTypeAvailability,
 } from "@/types/global";
-import { loadImageRoomType } from "@/services/api";
+import {
+  holdBooking,
+  loadImageRoomType,
+  searchAvailability,
+} from "@/services/api";
+import { useCurrentApp } from "@/components/context/app.context";
 
 const formatVND = (v: number) => v.toLocaleString("vi-VN") + " VND";
 
@@ -97,14 +103,62 @@ const RoomImageSlider: React.FC<{ images: string[]; altName: string }> = ({
 const HotelDetail: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const hotel: HotelAvailability | undefined = location.state?.hotel;
-  const meta: any = location.state?.meta;
-
+  const { hotelId } = useParams(); // Lấy id khách sạn từ URL\
+  // State mới để render (ban đầu là từ state nếu có)
+  const hotelFromState: HotelAvailability | undefined = location.state?.hotel;
+  const metaFromState: any = location.state?.meta;
+  console.log(hotelFromState, metaFromState);
+  // State mới để render (ban đầu là từ state nếu có)
+  const [hotel, setHotel] = useState<HotelAvailability | undefined>(
+    hotelFromState
+  );
+  const [meta, setMeta] = useState<any>(metaFromState);
+  const [loadingData, setLoadingData] = useState(false);
   const [menity, setAmenity] = useState<any[]>([]);
   const [roomImages, setRoomImages] = useState<Record<string, RoomTypeImages>>(
     {}
   );
+  useEffect(() => {
+    // Nếu đã có đủ data hotel+meta => render luôn
+    if (hotelFromState && metaFromState) {
+      setHotel(hotelFromState);
+      setMeta(metaFromState);
+      return;
+    }
+    // Nếu thiếu data, gọi lại API search để lấy đúng khách sạn này về
+    if (!hotelId) return;
 
+    // Lấy lại filter meta params cuối cùng từ sessionStorage
+    // NÊN lưu ở SearchResults mỗi khi search/filter thành công
+    const lastSearchParams = sessionStorage.getItem("lastSearchParams");
+    if (!lastSearchParams) {
+      // Không có filter, không biết search theo gì, chuyển user về trang tìm kiếm
+      navigate("/search-results");
+      return;
+    }
+    const parsedParams = JSON.parse(lastSearchParams);
+    // Gọi lại searchAvailability với filter+hotelId vừa lấy được
+    setLoadingData(true); // Show loading khi fetch lại
+    searchAvailability({ ...parsedParams, hotelId: Number(hotelId) })
+      .then((res) => {
+        const found = res.data.hotels?.find(
+          (h) => h.hotel_id === Number(hotelId)
+        );
+        if (found) {
+          setHotel(found);
+          setMeta(res.data.meta);
+        } else {
+          // Không tìm thấy khách sạn, quay về search
+          message.error("Không tìm thấy dữ liệu khách sạn này.");
+          navigate("/search-results");
+        }
+      })
+      .catch(() => {
+        message.error("Không thể nạp lại dữ liệu khách sạn.");
+        navigate("/search-results");
+      })
+      .finally(() => setLoadingData(false));
+  }, [hotelFromState, metaFromState, hotelId, navigate]);
   useEffect(() => {
     setAmenity(hotel?.amenity || []);
 
@@ -157,7 +211,7 @@ const HotelDetail: React.FC = () => {
       setRoomImages(Object.fromEntries(entries));
     };
 
-    fetchAllRoomTypeImages();
+    // fetchAllRoomTypeImages();
   }, [hotel]);
 
   const loading = false;
@@ -170,7 +224,96 @@ const HotelDetail: React.FC = () => {
     rp: RatePlanPrice;
     rt: RoomTypeAvailability;
   }> = ({ rp, rt }) => {
+    const [modalOpen, setModalOpen] = useState(false);
     const disableChoose = rt.total_rooms < meta?.requested_rooms;
+    const { isAuthenticated } = useCurrentApp();
+    const handleChooseRoom = async () => {
+      if (!isAuthenticated) {
+        setModalOpen(true);
+        return;
+      }
+      if (!hotel) {
+        message.error("Thiếu dữ liệu khách sạn");
+        return;
+      }
+      try {
+        // 1. Gọi lại API search phòng với params hiện tại và hotelId
+        const params = {
+          checkin: meta.checkin,
+          checkout: meta.checkout,
+          adults: meta.adults,
+          children: meta.children,
+          rooms: meta.requested_rooms,
+          hotelId: hotel.hotel_id,
+        };
+        const res = await searchAvailability(params);
+        const hotels = res.data?.hotels || [];
+
+        // 2. Tìm lại đúng hotel, roomType và ratePlan
+        const matchedHotel = hotels.find((h) => h.hotel_id === hotel.hotel_id);
+        if (!matchedHotel) {
+          message.error("Khách sạn này không còn phòng phù hợp.");
+          return;
+        }
+        // Tìm lại room type
+        const matchedRoomType = matchedHotel.matched_room_types.find(
+          (r) => r.room_type_id === rt.room_type_id
+        );
+        if (!matchedRoomType) {
+          message.error("Loại phòng này hiện không còn phù hợp.");
+          return;
+        }
+        // Tìm lại rate plan
+        const matchedRatePlan = matchedRoomType.rate_plans.find(
+          (r) => r.rate_plan_id === rp.rate_plan_id
+        );
+        if (!matchedRatePlan) {
+          message.error("Gói giá vừa chọn đã hết, vui lòng chọn lại.");
+          return;
+        }
+        // Đủ điều kiện, lưu flow và next
+
+        const booking = await holdBooking({
+          hotelId: hotel.hotel_id,
+          roomTypeId: rt.room_type_id,
+          checkin: meta.checkin,
+          ratePlanId: rp.rate_plan_id,
+          checkout: meta.checkout,
+          adults: meta.adults,
+          children: meta.children,
+          rooms: meta.requested_rooms,
+        });
+
+        const flow = {
+          selection: {
+            hotelId: hotel.hotel_id,
+            roomTypeId: rt.room_type_id,
+            ratePlanId: rp.rate_plan_id,
+            checkin: meta.checkin,
+            checkout: meta.checkout,
+            adults: meta.adults,
+            children: meta.children,
+            rooms: meta.requested_rooms,
+            price: matchedRatePlan.stay_total,
+            prepayRequired: !!matchedRatePlan.prepayment_required,
+          },
+          bookingId: booking.data?.id,
+        };
+
+        sessionStorage.setItem("bookingFlow", JSON.stringify(flow));
+        navigate("/booking", {
+          state: {
+            h: matchedHotel,
+            m: meta,
+            nrt: matchedRoomType.name,
+            nrp: matchedRatePlan.name,
+          },
+        });
+      } catch (err) {
+        console.error(err);
+        message.error("Không kiểm tra được phòng. Vui lòng thử lại.");
+      }
+    };
     const tooltipContent = (
       <div className="pt-wrap">
         <div className="pt-title">
@@ -193,98 +336,103 @@ const HotelDetail: React.FC = () => {
       </div>
     );
     return (
-      <div className="rp-row">
-        <div className="rp-cell rp-option">
-          <div className="rp-line-header">
-            <Tooltip title={rp.description} placement="top">
-              <span className="rp-room-rate-name"> {rp.name}</span>
-            </Tooltip>
+      <>
+        {" "}
+        <div className="rp-row">
+          <div className="rp-cell rp-option">
+            <div className="rp-line-header">
+              <Tooltip title={rp.description} placement="top">
+                <span className="rp-room-rate-name"> {rp.name}</span>
+              </Tooltip>
+            </div>
+            <div className="rp-line-content">
+              <div className="rp-bed">🛏 {rt.bed_config || "—"}</div>
+              <ul className="rp-policy-list">
+                <li>
+                  {rp.prepayment_required
+                    ? "Thanh toán trước"
+                    : "Thanh toán tại khách sạn"}
+                  <InfoCircleOutlined className="rp-info-icon" />
+                </li>
+              </ul>
+            </div>
           </div>
-          <div className="rp-line-content">
-            <div className="rp-bed">🛏 {rt.bed_config || "—"}</div>
-            <ul className="rp-policy-list">
-              <li>
-                {rp.prepayment_required
-                  ? "Thanh toán trước"
-                  : "Thanh toán tại khách sạn"}
-                <InfoCircleOutlined className="rp-info-icon" />
-              </li>
-            </ul>
-          </div>
-        </div>
 
-        <div className="rp-cell rp-rooms">
-          <div className="rp-guests-stack">
-            <span className="rp-guest-icon">👤</span>
-            <span className="rp-guest-count">{meta?.adults}</span>
-            {meta?.children > 0 && (
-              <span className="rp-guest-count">+{meta?.children} TE</span>
+          <div className="rp-cell rp-rooms">
+            <div className="rp-guests-stack">
+              <span className="rp-guest-icon">👤</span>
+              <span className="rp-guest-count">{meta?.adults}</span>
+              {meta?.children > 0 && (
+                <span className="rp-guest-count">+{meta?.children} TE</span>
+              )}
+            </div>
+          </div>
+
+          <div className="rp-cell rp-rooms">
+            <div className="rp-rooms-count">{meta?.requested_rooms} phòng</div>
+            <div
+              className={
+                "rp-remaining" +
+                (rt.total_rooms - meta?.requested_rooms <= 2 ? " hot" : "")
+              }
+            ></div>
+          </div>
+
+          <div className="rp-cell rp-price">
+            <Tooltip
+              overlayClassName="price-tooltip"
+              placement="bottom"
+              title={tooltipContent}
+            >
+              <div className="rp-current-price" role="button">
+                {rp.nightly_total.toLocaleString("vi-VN")} VND
+              </div>
+            </Tooltip>
+            <div className="rp-tax-note">Chưa bao gồm thuế và phí</div>
+          </div>
+
+          <div className="rp-cell rp-action">
+            <Button
+              type="primary"
+              size="small"
+              className="rp-choose-btn"
+              disabled={disableChoose}
+              onClick={handleChooseRoom}
+            >
+              Chọn
+            </Button>
+            {disableChoose && (
+              <div className="rp-remaining hot">Không đủ phòng cho yêu cầu</div>
             )}
           </div>
         </div>
-
-        <div className="rp-cell rp-rooms">
-          <div className="rp-rooms-count">{meta?.requested_rooms} phòng</div>
-          <div
-            className={
-              "rp-remaining" +
-              (rt.total_rooms - meta?.requested_rooms <= 2 ? " hot" : "")
-            }
-          ></div>
-        </div>
-
-        <div className="rp-cell rp-price">
-          <Tooltip
-            overlayClassName="price-tooltip"
-            placement="bottom"
-            title={tooltipContent}
-          >
-            <div className="rp-current-price" role="button">
-              {rp.nightly_total.toLocaleString("vi-VN")} VND
-            </div>
-          </Tooltip>
-          <div className="rp-tax-note">Chưa bao gồm thuế và phí</div>
-        </div>
-
-        <div className="rp-cell rp-action">
-          <Button
-            type="primary"
-            size="small"
-            className="rp-choose-btn"
-            disabled={disableChoose}
-            onClick={() => {
-              if (!hotel) {
-                message.error("Thiếu dữ liệu khách sạn");
-                return;
-              }
-              const flow = {
-                selection: {
-                  hotelId: hotel.hotel_id,
-                  roomTypeId: rt.room_type_id,
-                  ratePlanId: rp.rate_plan_id,
-                  checkin: meta.checkin,
-                  checkout: meta.checkout,
-                  adults: meta.adults,
-                  children: meta.children,
-                  rooms: meta.requested_rooms,
-                  price: rp.stay_total,
-                  prepayRequired: !!rp.prepayment_required,
-                },
-                bookingId: null,
-              };
-              sessionStorage.setItem("bookingFlow", JSON.stringify(flow));
-              navigate("/booking", {
-                state: { h: hotel, m: meta, nrt: rt.name, nrp: rp.name },
-              });
-            }}
-          >
-            Chọn
-          </Button>
-          {disableChoose && (
-            <div className="rp-remaining hot">Không đủ phòng cho yêu cầu</div>
-          )}
-        </div>
-      </div>
+        <Modal
+          open={modalOpen}
+          onCancel={() => setModalOpen(false)}
+          footer={null}
+          centered
+        >
+          <div style={{ textAlign: "center", padding: 16 }}>
+            <h3>Bạn cần đăng nhập để đặt phòng</h3>
+            <p>
+              Vui lòng đăng nhập để tiếp tục đặt phòng với lựa chọn của bạn.
+            </p>
+            <Button
+              type="primary"
+              onClick={() => {
+                navigate("/login", {
+                  state: {
+                    redirectPath: location.pathname + location.search,
+                  },
+                });
+              }}
+              style={{ width: "100%", marginTop: 16 }}
+            >
+              Đăng nhập ngay
+            </Button>
+          </div>
+        </Modal>
+      </>
     );
   };
 

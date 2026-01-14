@@ -1,4 +1,10 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { fetchAccountApi } from "@/services/api";
 
 type User = {
@@ -6,7 +12,7 @@ type User = {
   email: string;
   role: "ADMIN" | "HOTEL_OWNER" | "CUSTOMER";
   avatar?: string;
-  // ...các field khác
+  fullname: string;
 } | null;
 
 type AppContextType = {
@@ -21,7 +27,9 @@ type AppContextType = {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [user, setUser] = useState<User>(null);
   const [isAppLoading, setIsAppLoading] = useState<boolean>(true);

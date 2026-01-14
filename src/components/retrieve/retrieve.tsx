@@ -30,7 +30,6 @@ import {
 } from "@ant-design/icons";
 import { cancelBooking, fetchAccountApi, getMyBooking } from "@/services/api";
 import "./retrieve.scss";
-import type { ActionType } from "@ant-design/pro-components";
 
 const { Sider, Content } = Layout;
 const { Title, Text } = Typography;
@@ -43,7 +42,6 @@ const SIDER_WIDTH = 260; // thu hẹp sidebar
 
 export default function Retrieve() {
   const [form] = Form.useForm();
-  const actionRef = useRef<ActionType | undefined>(undefined);
   const { message, modal, notification } = App.useApp();
   const [account, setAccount] = useState<any | null>(null);
   const [bookings, setBookings] = useState<any[]>([]);
@@ -161,7 +159,7 @@ export default function Retrieve() {
             const res = await cancelBooking(id);
             if (res.data) {
               message.success("Bạn đã hủy phòng thành công");
-              actionRef.current?.reload();
+              await fetchMyBooking();
             }
           } catch (err: any) {
             message.error(err?.response?.data?.message || "Hủy phòng thất bại");
@@ -183,7 +181,7 @@ export default function Retrieve() {
                 <Tag color="gold">{`${hotel.star_rating}★`}</Tag>
               ) : null}
               <Tag color={statusTagColor(b?.status)}>
-                {b?.status || "STATUS"}
+                {b?.status === "CONFIRMED" ? "Chưa thu tiền" : "Đã thu tiền"}
               </Tag>
             </div>
           </div>
@@ -196,7 +194,6 @@ export default function Retrieve() {
           </div>
         </div>
 
-        {/* Info grid */}
         <Row gutter={[12, 12]} className="booking-card__grid">
           <Col xs={24} md={14}>
             <Card className="booking-card__section" bordered={false}>

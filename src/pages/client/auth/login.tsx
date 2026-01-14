@@ -11,7 +11,7 @@ import {
 } from "antd";
 import { MailOutlined, LockOutlined } from "@ant-design/icons";
 import { loginApi } from "@/services/api";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useCurrentApp } from "@/components/context/app.context";
 
 const { Title } = Typography;
@@ -25,30 +25,36 @@ const LoginPage = () => {
   const { message } = App.useApp();
   const [isSubmit, setIsSubmit] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation(); // THÊM DÒNG NÀY
+
   const { setIsAuthenticated, setUser, user } = useCurrentApp();
   const onFinish: FormProps<FieldType>["onFinish"] = async (values) => {
     const { email, password } = values;
     setIsSubmit(true);
     const res = await loginApi(email, password);
     if (res.data) {
-      setIsAuthenticated(true), setUser(res.data.user);
+      setIsAuthenticated(true);
+      setUser(res.data.user);
       localStorage.setItem("access_token", res.data.access_token);
       message.success(res.message);
-      if (user?.role === "ADMIN") {
+
+      // ƯU TIÊN REDIRECT LẠI TRANG CŨ Nếu có
+      const redirectPath = location.state?.redirectPath;
+      if (redirectPath) {
+        navigate(redirectPath, { replace: true });
+      } else if (res.data.user?.role === "ADMIN") {
         navigate("/admin");
-      }
-      if (user?.role === "HOTEL_OWNER") {
+      } else if (res.data.user?.role === "HOTEL_OWNER") {
         navigate("/partner/dashboard");
-      }
-      if (user?.role === "CUSTOMER") {
+      } else if (res.data.user?.role === "CUSTOMER") {
         navigate("/");
       }
     } else {
       message.error(res.message);
     }
-
     setIsSubmit(false);
   };
+
   return (
     <div
       style={{

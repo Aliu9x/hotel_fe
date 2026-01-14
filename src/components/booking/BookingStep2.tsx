@@ -34,6 +34,7 @@ const BookingStep2: React.FC = () => {
   const location = useLocation();
   const dataBooking: any = location.state.dataBooking;
   const nameHotel: any = location.state.n;
+  console;
   const navigate = useNavigate();
   const { message } = App.useApp();
 
@@ -54,7 +55,6 @@ const BookingStep2: React.FC = () => {
       if (selection) {
         navigate("/booking", { replace: true });
       } else {
-        message.warning("Vui lòng thực hiện Bước 1 trước.");
         navigate("/", { replace: true });
       }
     }
@@ -108,11 +108,10 @@ const BookingStep2: React.FC = () => {
             sessionStorage.removeItem("bookingFlow");
           } catch {}
           setShowSuccess(true);
-          navigate("/", { replace: true });
         }
       } catch {}
     }
-    timer = setInterval(pollStatus, 3000);
+    timer = setInterval(pollStatus, 100000);
     return () => clearInterval(timer);
   }, [bookingId, navigate]);
 
@@ -132,10 +131,6 @@ const BookingStep2: React.FC = () => {
         const res = await updatePaymentMethod(String(bookingId), paymentMethod);
         if (res) {
           setShowSuccess(true);
-          setTimeout(() => {
-            sessionStorage.removeItem("bookingFlow");
-          }, 10000);
-          navigate("/retrieve");
           return;
         }
       }
@@ -173,7 +168,6 @@ const BookingStep2: React.FC = () => {
           sessionStorage.removeItem("bookingFlow");
         } catch {}
         message.error("Đã hết thời gian thanh toán");
-        navigate(-1);
 
         return;
       }
@@ -202,8 +196,12 @@ const BookingStep2: React.FC = () => {
           <header className="pay-header">
             <div className="pay-header-inner">
               <div className="timer">
-                <span>Hoàn tất thanh toán của bạn bằng </span>
+                <span>Thời gian giữ phòng của bạn còn lại </span>
                 <span className="timer-pill">{countdownText}</span>
+                <span>Phút</span>
+              </div>
+              <div className="timer">
+                <span>thanh toán</span>
               </div>
             </div>
           </header>
@@ -219,20 +217,6 @@ const BookingStep2: React.FC = () => {
                   </div>
                 ) : (
                   <>
-                    {booking?.status === "HOLD" && holdInfo ? (
-                      <div className="hold-banner">
-                        <span className="hold-label">Mã giữ</span>{" "}
-                        {holdInfo.reservationCode}
-                        <span className="hold-exp">
-                          <span className="timer-pill">{countdownText}</span>
-                        </span>
-                      </div>
-                    ) : (
-                      <div className="hold-banner muted">
-                        Trạng thái: {booking?.status}
-                      </div>
-                    )}
-
                     <Radio.Group
                       value={paymentMethod}
                       onChange={(e) => setPaymentMethod(e.target.value)}
@@ -299,7 +283,8 @@ const BookingStep2: React.FC = () => {
                 <div className="total-line">
                   <span>Tổng giá tiền</span>
                   <span className="total-amount">
-                    {Number(booking?.amount ?? 0).toLocaleString("vi-VN")} VND
+                    {Number(booking?.total_price ?? 0).toLocaleString("vi-VN")}{" "}
+                    VND
                   </span>
                 </div>
                 <div className="cta-row">
@@ -332,7 +317,7 @@ const BookingStep2: React.FC = () => {
                   </div>
                 </div>
                 <div className="hotel-card-body">
-                  <div className="hotel-name">{nameHotel.hotel_name}</div>
+                  <div className="hotel-name">{nameHotel.name}</div>
                   <div className="stay-dates">
                     Nhận phòng: <b>{dataBooking?.checkin_date}</b>
                     <br />
@@ -381,7 +366,7 @@ const BookingStep2: React.FC = () => {
       )}
       <PaymentSuccessModal
         open={showSuccess}
-        onDone={() => navigate("/", { replace: true })}
+        onDone={() => navigate("/retrieve", { replace: true })}
       />
     </>
   );

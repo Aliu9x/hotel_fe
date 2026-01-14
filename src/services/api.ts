@@ -92,6 +92,11 @@ export const deleteRoomType = (id: string) => {
   return axios.delete<IBackendRes<IRoomType>>(urlBackend);
 };
 
+export const getRoomTypeById = (id: string) => {
+  const urlBackend = `/api/v1/room-types/${id}`;
+  return axios.get<IBackendRes<IRoomType>>(urlBackend);
+};
+
 export const createRoomType = (create: IRoomType) => {
   const urlBackend = "/api/v1/room-types";
   return axios.post<IBackendRes<IRoomType>>(urlBackend, create);
@@ -122,6 +127,10 @@ export const updateRatePlan = (id: string, payload: IUpdateRatePlanPayload) => {
 
 export const deleteRatePlan = (id: string) => {
   return axios.delete<IBackendRes<null>>(`/api/v1/rate-plans/${id}`);
+};
+
+export const geRatePlanById = (id: string) => {
+  return axios.get<IBackendRes<null>>(`/api/v1/rate-plans/${id}`);
 };
 /////////////////////////////////
 export const loadImageRoomType = async (id: string) => {
@@ -430,8 +439,13 @@ export const fetchHotelRoomTypes = async (params: IHotelRoomTypesParams) => {
 };
 
 /////////////////////////boongKing//////////////////
-export async function createBooking(payload: any) {
-  const url = "/api/v1/bookings";
+export async function updateBooking(payload: any, id: string) {
+  const url = `/api/v1/bookings/${id}`;
+  return axios.patch<IBackendRes<CreateBookingPayload>>(url, payload);
+}
+
+export async function holdBooking(payload: any) {
+  const url = "/api/v1/bookings/hold";
   return axios.post<IBackendRes<CreateBookingPayload>>(url, payload);
 }
 export async function startMomoPayment(bookingId: string | number) {

@@ -208,7 +208,7 @@ const LayoutOwner: React.FC = () => {
   const isAdminRoute = location.pathname.includes("admin");
   if (isAuthenticated === true && isAdminRoute === true) {
     const role = user?.role;
-    if (role === "USER") {
+    if (role === "CUSTOMER") {
       return (
         <Result
           status="403"
@@ -255,7 +255,7 @@ const LayoutOwner: React.FC = () => {
         <Dropdown menu={{ items: itemsDropdown }} trigger={["click"]}>
           <Space style={{ cursor: "pointer", fontWeight: 500 }}>
             <Avatar src={urlAvatar} />
-            {user?.fullName}
+            {user?.fullname}
           </Space>
         </Dropdown>
       </Header>

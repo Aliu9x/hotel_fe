@@ -50,7 +50,6 @@ type Hotel = {
   contact_name?: string;
   contact_email?: string;
   contact_phone?: string;
-  // Contract (read-only here)
   legal_name?: string;
   legal_address?: string;
   signer_full_name?: string;
@@ -65,6 +64,7 @@ type Hotel = {
 
 const HotelInfo: React.FC = () => {
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [hotel, setHotel] = useState<Hotel | null>(null);
   const [isEditing, setIsEditing] = useState(false);
 
@@ -82,7 +82,6 @@ const HotelInfo: React.FC = () => {
       try {
         const data = await getMyHotel();
         setHotel(data);
-        // Prefill editable fields (Section 1)
         form.setFieldsValue({
           name: data?.name,
           description: data?.description,
@@ -103,7 +102,6 @@ const HotelInfo: React.FC = () => {
     })();
   }, [form]);
 
-  // Load provinces
   useEffect(() => {
     (async () => {
       try {
@@ -116,12 +114,11 @@ const HotelInfo: React.FC = () => {
           }))
         );
       } catch {
-        // ignore
+        // silent
       }
     })();
   }, []);
 
-  // Load districts when province changes
   useEffect(() => {
     (async () => {
       if (!province_id) {
@@ -149,7 +146,9 @@ const HotelInfo: React.FC = () => {
           form.setFieldsValue({ district_id: undefined, ward_id: undefined });
           setWards([]);
         }
-      } catch {}
+      } catch {
+        // silent
+      }
     })();
   }, [province_id, form]);
 
@@ -175,7 +174,9 @@ const HotelInfo: React.FC = () => {
         ) {
           form.setFieldsValue({ ward_id: undefined });
         }
-      } catch {}
+      } catch {
+        // silent
+      }
     })();
   }, [district_id, form]);
 
@@ -201,6 +202,16 @@ const HotelInfo: React.FC = () => {
     try {
       await form.validateFields();
       const values = form.getFieldsValue(true);
+
+      // Ràng buộc province → district, district → ward (giống finalizeOverview)
+      if (values.province_id && !values.district_id) {
+        message.error("Vui lòng chọn Quận/Huyện");
+        return;
+      }
+      if (values.district_id && !values.ward_id) {
+        message.error("Vui lòng chọn Phường/Xã");
+        return;
+      }
 
       const asStr = (v: any) =>
         typeof v === "string" ? v.trim() : String(v ?? "").trim();
@@ -239,7 +250,9 @@ const HotelInfo: React.FC = () => {
         return;
       }
 
-      const updated = await createHotel(payload);
+      setSaving(true);
+      const res = await createHotel(payload);
+      const updated: Hotel = (res && res.data) || res; // hỗ trợ cả 2 dạng trả về
 
       setHotel((prev) => (prev ? { ...prev, ...updated } : updated));
       message.success("Đã cập nhật thông tin mục 1");
@@ -252,6 +265,8 @@ const HotelInfo: React.FC = () => {
         message.error(
           e?.message || e?.original?.message || "Lỗi cập nhật thông tin"
         );
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -289,7 +304,12 @@ const HotelInfo: React.FC = () => {
                 <Button icon={<RollbackOutlined />} onClick={toggleEdit}>
                   Hủy
                 </Button>
-                <Button type="primary" icon={<SaveOutlined />} onClick={onSave}>
+                <Button
+                  type="primary"
+                  icon={<SaveOutlined />}
+                  onClick={onSave}
+                  loading={saving}
+                >
                   Lưu thay đổi
                 </Button>
               </>

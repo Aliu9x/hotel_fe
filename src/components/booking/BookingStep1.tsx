@@ -1,9 +1,14 @@
 import React, { useMemo, useState, useEffect, useRef } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { Button, Input, Form, Checkbox, App } from "antd";
-import { createBooking } from "@/services/api";
 import "./bookingStep1.css";
-import type { HotelAvailability } from "@/types/global";
+import {
+  geRatePlanById,
+  getBooking,
+  getHotelById,
+  getRoomTypeById,
+  updateBooking,
+} from "@/services/api";
 
 type Selection = {
   hotelId: number;
@@ -32,26 +37,48 @@ const readSelection = (): Selection | null => {
   }
 };
 
-const writeBookingId = (id: string | number) => {
+const readSelectionId = (): any => {
   try {
     const raw = sessionStorage.getItem(STORAGE_KEY);
-    const json = raw ? JSON.parse(raw) : {};
-    json.bookingId = id;
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(json));
-  } catch {}
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed?.bookingId;
+  } catch {
+    return null;
+  }
 };
 
 const BookingStep1: React.FC = () => {
   const navigate = useNavigate();
   const selection = readSelection();
+  const idBooking = readSelectionId();
   const redirectedOnce = useRef(false);
   const { message } = App.useApp();
-  const location = useLocation();
-
-  const hotel: HotelAvailability | undefined = location.state.h;
-
-  const nrt: any | undefined = location.state.nrt;
-  const nrp: any | undefined = location.state.nrp;
+  const [hotel, setHotel] = useState<any>(null);
+  const [nrt, setNrt] = useState<any>(null);
+  const [nrp, setNrp] = useState<any>(null);
+  const [booking, setBooking] = useState<any>(null);
+  useEffect(() => {
+    const getBookings = async () => {
+      const res = await getBooking(idBooking);
+      if (res && res.data) {
+        setBooking(res.data);
+        const h = await getHotelById(res.data.hotel_id);
+        if (h && h.data) {
+          setHotel(h.data);
+        }
+        const rt = await getRoomTypeById(res.data.room_type_id);
+        if (rt && rt.data) {
+          setNrt(rt.data);
+        }
+        const rp = await geRatePlanById(res.data.rate_plan_id);
+        if (rp && rp.data) {
+          setNrp(rp.data);
+        }
+      }
+    };
+    getBookings();
+  }, []);
 
   useEffect(() => {
     if (!selection && !redirectedOnce.current) {
@@ -82,7 +109,20 @@ const BookingStep1: React.FC = () => {
       prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v]
     );
   };
+  useEffect(() => {
+    if (!booking) return;
 
+    contactForm.setFieldsValue({
+      contactName: booking.contact_name,
+      contactEmail: booking.contact_email,
+      contactPhone: booking.contact_phone,
+      selfBook: booking.is_self_book === 1,
+    });
+
+    guestForm.setFieldsValue({
+      guestName: booking.guest_name,
+    });
+  }, [booking, contactForm, guestForm]);
   const handleContinue = async () => {
     try {
       await contactForm.validateFields();
@@ -91,28 +131,18 @@ const BookingStep1: React.FC = () => {
       const c = contactForm.getFieldsValue();
       const g = guestForm.getFieldsValue();
 
-      const booking = await createBooking({
-        hotelId: selection.hotelId,
-        roomTypeId: selection.roomTypeId,
-        ratePlanId: selection.ratePlanId,
-        checkin: selection.checkin,
-        checkout: selection.checkout,
-        adults: selection.adults,
-        children: selection.children,
-        rooms: selection.rooms,
-        contactName: c.contactName,
-        contactEmail: c.contactEmail,
-        contactPhone: c.contactPhone,
-        isSelfBook: c.selfBook ? 1 : 0,
-        guestName: g.guestName,
-        specialRequests,
-        total_price: selection.price,
-        promoTag: selection.promo,
-      });
-
-      const bookingId = booking?.data?.id;
-      writeBookingId(String(bookingId));
-
+      const booking = await updateBooking(
+        {
+          contactName: c.contactName,
+          contactEmail: c.contactEmail,
+          contactPhone: c.contactPhone,
+          isSelfBook: c.selfBook ? 1 : 0,
+          total_price: selection.price,
+          promoTag: selection.promo,
+          guestName: g.guestName,
+        },
+        idBooking
+      );
       navigate("/booking/confirm", {
         replace: true,
         state: { dataBooking: booking?.data, n: hotel },
@@ -135,13 +165,13 @@ const BookingStep1: React.FC = () => {
             // className="s1-logo"
             />
             <div className="s1-hotel-title">
-              {hotel?.hotel_name}
+              {hotel?.name}
               {/* <span className="s1-rating">9.5/10</span>
               <span className="s1-reviews">(362 đánh giá)</span> */}
             </div>
           </div>
           <div className="s1-steps">
-            <span>Thanh toán</span>
+            <span>Xem lại</span>
           </div>
         </div>
       </header>
@@ -244,7 +274,7 @@ const BookingStep1: React.FC = () => {
                 Bạn có lựa chọn tuyệt vời cho kỳ nghỉ của mình.
               </div>
               <div className="s1-room-title">
-                {nrt} - {nrp}
+                {nrt?.name} - {nrp?.name}{" "}
               </div>
               <div className="s1-stay-info">
                 <div>

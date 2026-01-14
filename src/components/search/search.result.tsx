@@ -1,4 +1,4 @@
-import React, { useEffect,  useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import {
   Slider,
@@ -72,7 +72,6 @@ const SearchResults: React.FC = () => {
   const [sort, setSort] = useState<SortOption>(
     (searchParams.get("sort") as SortOption) || DEFAULT_SORT
   );
-
 
   const [roomAmenitiesOptions, setRoomAmenitiesOptions] = useState<
     { label: string; value: string }[]
@@ -197,6 +196,20 @@ const SearchResults: React.FC = () => {
 
     return params;
   };
+  useEffect(() => {
+    const params = buildParamsFromState();
+    if (params)
+      sessionStorage.setItem("lastSearchParams", JSON.stringify(params));
+  }, [
+    priceRange,
+    starRange,
+    roomAmenityIds,
+    hotelAmenityIds,
+    flexible,
+    sort,
+    searchParams,
+    availability,
+  ]);
   const applyFilters = useCallback(async () => {
     const params = buildParamsFromState();
     if (!params) return;
@@ -388,8 +401,6 @@ const SearchResults: React.FC = () => {
                     className="sr-hotelCard"
                     style={{ cursor: "pointer" }}
                     onClick={() => {
-                      const hotels = availability.hotels;
-                      console.log(hotels);
                       navigate(`/hotel-detail/${h.hotel_id}`, {
                         state: { hotel: h, meta: availability.meta },
                       });
@@ -450,6 +461,7 @@ const SearchResults: React.FC = () => {
                       <div className="sr-hotelCard__address">
                         {h.address_line || h.address_line}
                       </div>
+
                       <div className="sr-hotelCard__stars">
                         {"★".repeat(h.star_rating || 0)}
                       </div>

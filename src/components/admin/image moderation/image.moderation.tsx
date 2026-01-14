@@ -102,18 +102,14 @@ export const ImageModeration: React.FC = () => {
                   borderRadius: 8,
                   border: "1px solid #eee",
                 }}
-                preview={false}
                 fallback={`${
                   import.meta.env.VITE_BACKEND_URL
                 }/images/fallback.jpg`}
+                preview={{
+                  src: src,
+                  mask: "Xem ảnh",
+                }}
               />
-              <Button
-                size="small"
-                icon={<EyeOutlined />}
-                onClick={() => setPreviewSrc(src)}
-              >
-                Xem ảnh
-              </Button>
             </div>
           );
         },

@@ -12,7 +12,7 @@ export const PaymentSuccessModal = ({
     if (!open) return;
     const timer = setTimeout(() => {
       onDone();
-    }, 2500); 
+    }, 5000);
     return () => clearTimeout(timer);
   }, [open]);
 
